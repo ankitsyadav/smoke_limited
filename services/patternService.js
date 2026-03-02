@@ -415,6 +415,159 @@ async function getConsecutiveLimitBreachDays(userId, createdAt) {
   return streak;
 }
 
+// ── Craving Prediction: smarter next-craving forecast ──
+// Uses: hourly distribution + personal avg gap + current gap to predict
+async function predictNextCraving(userId, createdAt) {
+  const hourly = await getHourlyDistribution(userId, 30, createdAt);
+  const nowHour = moment().hour();
+  const nowMin = moment().minute();
+  const total = hourly.reduce((a, b) => a + b, 0);
+  if (total === 0) return { nextLikelyHour: null, confidence: 0, minutesUntil: null };
+
+  const avgGap = await getAverageGap(userId);
+  const lastMin = await getLastCigaretteMinutesAgo(userId);
+
+  // Method 1: Gap-based prediction (when is the next one if avg gap holds?)
+  let gapPredictionMin = null;
+  if (avgGap && lastMin !== null) {
+    gapPredictionMin = Math.max(0, avgGap - lastMin);
+  }
+
+  // Method 2: Hourly pattern — look ahead for busiest upcoming hours
+  // Score each upcoming hour by historical count, weighted by proximity
+  let bestHour = null;
+  let bestScore = 0;
+  for (let offset = 0; offset <= 12; offset++) {
+    const h = (nowHour + offset) % 24;
+    // Skip current hour if we already passed most of it
+    if (offset === 0 && nowMin > 45) continue;
+    const proxWeight = 1 + (12 - offset) * 0.05; // slight boost for nearer hours
+    const score = hourly[h] * proxWeight;
+    if (score > bestScore) {
+      bestScore = score;
+      bestHour = h;
+    }
+  }
+
+  if (bestHour === null || bestScore === 0) return { nextLikelyHour: null, confidence: 0, minutesUntil: null };
+
+  // Minutes until that hour
+  let minutesUntilHour;
+  if (bestHour === nowHour) {
+    minutesUntilHour = 0;
+  } else if (bestHour > nowHour) {
+    minutesUntilHour = (bestHour - nowHour) * 60 - nowMin;
+  } else {
+    minutesUntilHour = (24 - nowHour + bestHour) * 60 - nowMin;
+  }
+
+  // Blend: if gap prediction is available and sooner, use it
+  let finalMinutes = minutesUntilHour;
+  if (gapPredictionMin !== null && gapPredictionMin < minutesUntilHour) {
+    finalMinutes = Math.round(gapPredictionMin * 0.6 + minutesUntilHour * 0.4);
+  }
+
+  // Confidence: based on data density + how peaky the distribution is
+  const peakRatio = hourly[bestHour] / total;
+  const dataFactor = Math.min(1, total / 30); // enough data?
+  const confidence = Math.min(95, Math.round(peakRatio * 100 * 2.5 * dataFactor));
+
+  return {
+    nextLikelyHour: bestHour,
+    confidence,
+    minutesUntil: Math.max(0, Math.round(finalMinutes))
+  };
+}
+
+// ── Trigger × Time correlation (find hidden combos) ──
+async function getTriggerTimeCorrelation(userId, createdAt) {
+  const maxDays = Math.min(30, daysSinceAnchor(createdAt));
+  const since = clampStart(moment().subtract(maxDays, 'days').startOf('day').toDate(), createdAt);
+  const logs = await SmokeLog.find({ userId, timestamp: { $gte: since }, trigger: { $ne: '' } });
+
+  // Build trigger × hour-block matrix
+  const combos = {};
+  logs.forEach(l => {
+    const hourBlock = Math.floor(moment(l.timestamp).hour() / 4); // 0-5 (4-hour blocks)
+    const blockLabels = ['12AM-4AM', '4AM-8AM', '8AM-12PM', '12PM-4PM', '4PM-8PM', '8PM-12AM'];
+    const key = l.trigger + ' + ' + blockLabels[hourBlock];
+    combos[key] = (combos[key] || 0) + 1;
+  });
+
+  // Sort and return top 3
+  const sorted = Object.entries(combos).sort((a, b) => b[1] - a[1]);
+  const total = logs.length || 1;
+  return sorted.slice(0, 3).map(([combo, count]) => ({
+    combo,
+    count,
+    percentage: Math.round((count / total) * 100)
+  }));
+}
+
+// ── Achievements / Milestones ──
+async function getAchievements(userId, createdAt) {
+  const settings = (await require('../models/UserSettings').findOne({ userId })) || { dailyGoal: 5 };
+  const goal = settings.dailyGoal;
+  const lastMin = await getLastCigaretteMinutesAgo(userId);
+  const streakData = await getStreakData(userId, createdAt);
+  const totalLifetime = await getTotalLifetime(userId);
+  const avgGap = await getAverageGap(userId);
+
+  const achievements = [];
+
+  // Smoke-free time milestones
+  const timeMilestones = [
+    { id: 'sf_1h', label: '1 Hour Clean', icon: '⏱️', minGap: 60 },
+    { id: 'sf_2h', label: '2 Hours Clean', icon: '💪', minGap: 120 },
+    { id: 'sf_4h', label: '4 Hours Strong', icon: '🛡️', minGap: 240 },
+    { id: 'sf_8h', label: '8 Hour Warrior', icon: '⚔️', minGap: 480 },
+    { id: 'sf_12h', label: 'Half Day Hero', icon: '🏅', minGap: 720 },
+    { id: 'sf_24h', label: 'Full Day Champion', icon: '🏆', minGap: 1440 }
+  ];
+
+  const resolvedTimeMilestones = timeMilestones.map(m => ({
+    ...m,
+    unlocked: lastMin !== null && lastMin >= m.minGap
+  }));
+
+  // Streak milestones
+  const streakMilestones = [
+    { id: 'streak_1', label: '1 Day Under Limit', icon: '🔥', minStreak: 1 },
+    { id: 'streak_3', label: '3 Day Streak', icon: '🔥🔥', minStreak: 3 },
+    { id: 'streak_7', label: 'Week Warrior', icon: '⭐', minStreak: 7 },
+    { id: 'streak_14', label: '2 Week Legend', icon: '🌟', minStreak: 14 },
+    { id: 'streak_30', label: 'Monthly Master', icon: '👑', minStreak: 30 }
+  ];
+
+  const resolvedStreakMilestones = streakMilestones.map(m => ({
+    ...m,
+    unlocked: streakData.currentStreak >= m.minStreak
+  }));
+
+  return {
+    timeMilestones: resolvedTimeMilestones,
+    streakMilestones: resolvedStreakMilestones,
+    gapRecord: avgGap || 0
+  };
+}
+
+// ── Weekday × Hour Heatmap (7×24 matrix) ──
+async function getWeekdayHourlyHeatmap(userId, createdAt) {
+  const maxDays = Math.min(90, daysSinceAnchor(createdAt));
+  const since = clampStart(moment().subtract(maxDays, 'days').startOf('day').toDate(), createdAt);
+  const logs = await SmokeLog.find({ userId, timestamp: { $gte: since } });
+
+  // 7 rows (Mon-Sun) × 24 cols (hours)
+  const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
+  logs.forEach(l => {
+    const wd = moment(l.timestamp).isoWeekday() - 1; // 0=Mon
+    const hr = moment(l.timestamp).hour();
+    matrix[wd][hr]++;
+  });
+
+  return matrix;
+}
+
 module.exports = {
   getEarliestLogDate,
   getHourlyDistribution,
@@ -440,5 +593,9 @@ module.exports = {
   getGapTrend,
   getTodayTriggerBreakdown,
   getWeightedTrend,
-  getConsecutiveLimitBreachDays
+  getConsecutiveLimitBreachDays,
+  predictNextCraving,
+  getTriggerTimeCorrelation,
+  getAchievements,
+  getWeekdayHourlyHeatmap
 };

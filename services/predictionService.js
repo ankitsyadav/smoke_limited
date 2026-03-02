@@ -139,24 +139,30 @@ async function calculateRiskScore(userId, createdAt) {
   // ═══════════════════════════════════════════
   // 4. PEAK HOUR PROXIMITY (max 15)
   //    Gradient scoring: closer = higher
+  //    + weekend/weekday factor
   // ═══════════════════════════════════════════
   const hourDiff = Math.min(Math.abs(nowHour - peakHour), 24 - Math.abs(nowHour - peakHour));
+  const isWeekend = [0, 6].includes(moment().day()); // 0=Sun, 6=Sat
+  const weekendBoost = isWeekend ? 3 : 0; // weekends = higher risk typically
+
   if (hourDiff === 0) {
-    scoreBreakdown.peak = 15;
+    scoreBreakdown.peak = Math.min(15, 15 + weekendBoost);
     flags.push({
-      text: `Peak hour hai abhi — ${formatHour(peakHour)} pe sabse zyada peete ho`,
+      text: `Peak hour hai abhi — ${formatHour(peakHour)} pe sabse zyada peete ho${isWeekend ? ' (weekend!)' : ''}`,
       severity: 'warning', category: 'pattern',
       trend: 'stable', icon: 'alarm'
     });
   } else if (hourDiff === 1) {
-    scoreBreakdown.peak = 10;
+    scoreBreakdown.peak = Math.min(15, 10 + weekendBoost);
     flags.push({
       text: `Peak hour (${formatHour(peakHour)}) ke paas ho — alert raho`,
       severity: 'info', category: 'pattern',
       trend: 'stable', icon: 'alarm'
     });
   } else if (hourDiff === 2) {
-    scoreBreakdown.peak = 5;
+    scoreBreakdown.peak = Math.min(15, 5 + weekendBoost);
+  } else if (weekendBoost > 0) {
+    scoreBreakdown.peak = weekendBoost; // small boost even if far from peak on weekends
   }
 
   // ═══════════════════════════════════════════

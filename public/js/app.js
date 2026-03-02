@@ -38,6 +38,139 @@ document.addEventListener('DOMContentLoaded', function () {
   // ══════════════════════════════════════
   // ── PUTER.JS AI HELPER (FREE GPT) ──
   // ══════════════════════════════════════
+
+  // Auth state tracking
+  let _puterAuthed = false;
+  let _puterSkipped = sessionStorage.getItem('puterSkipped') === 'true';
+
+  function isPuterAuthed() {
+    if (_puterAuthed) return true;
+    try {
+      if (typeof puter !== 'undefined' && puter.auth && typeof puter.auth.isSignedIn === 'function') {
+        _puterAuthed = puter.auth.isSignedIn();
+        return _puterAuthed;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  // Attempt Puter sign-in; resolves true on success, false on cancel/error
+  async function doPuterSignIn() {
+    try {
+      if (typeof puter !== 'undefined' && puter.auth && puter.auth.signIn) {
+        await puter.auth.signIn();
+        _puterAuthed = true;
+        _puterSkipped = false;
+        sessionStorage.removeItem('puterSkipped');
+        return true;
+      }
+    } catch (e) {
+      console.warn('[PuterAuth] Sign-in cancelled or failed', e);
+    }
+    return false;
+  }
+
+  function markPuterSkipped() {
+    _puterSkipped = true;
+    sessionStorage.setItem('puterSkipped', 'true');
+  }
+
+  // ── Full CTA: shimmer preview + heading + features + button ──
+  function renderAIConsentCTA(targetEl, opts) {
+    if (!targetEl) return;
+    const compact = opts && opts.compact;
+    const onDone = opts && opts.onAuthed; // callback after successful auth
+
+    const wrap = document.createElement('div');
+    wrap.className = compact ? 'ai-consent-compact' : 'ai-consent-wrap';
+
+    if (!compact) {
+      // Shimmer preview lines
+      wrap.innerHTML += `
+        <div class="ai-consent-preview">
+          <div class="ai-consent-line"></div>
+          <div class="ai-consent-line"></div>
+          <div class="ai-consent-line"></div>
+        </div>`;
+    }
+
+    wrap.innerHTML += `
+      <div class="ai-consent-heading">
+        <i class="bi bi-stars"></i> ${compact ? 'AI ne kuch dekha hai' : 'Get Your AI Insights'}
+      </div>`;
+
+    if (!compact) {
+      wrap.innerHTML += `
+        <div class="ai-consent-features">
+          <span class="ai-consent-feature">🧠 Smart Pattern Detection</span>
+          <span class="ai-consent-feature">💡 Personalized Tips</span>
+          <span class="ai-consent-feature">📊 Risk Analysis</span>
+        </div>`;
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'ai-consent-btn';
+    btn.innerHTML = '<i class="bi bi-unlock"></i> Enable AI Insights';
+    btn.onclick = async function () {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Connecting...';
+      const ok = await doPuterSignIn();
+      if (ok) {
+        wrap.classList.add('ai-consent-fadeout');
+        setTimeout(() => {
+          wrap.remove();
+          if (onDone) onDone();
+        }, 300);
+      } else {
+        // User cancelled Puter popup
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-unlock"></i> Enable AI Insights';
+        showToast('No worries! AI available anytime 🤖');
+        markPuterSkipped();
+        renderAIMiniPill(targetEl);
+        wrap.classList.add('ai-consent-fadeout');
+        setTimeout(() => wrap.remove(), 300);
+      }
+    };
+    wrap.appendChild(btn);
+
+    // Skip link
+    const skip = document.createElement('button');
+    skip.className = 'ai-consent-skip';
+    skip.textContent = 'Not Now';
+    skip.onclick = function () {
+      markPuterSkipped();
+      wrap.classList.add('ai-consent-fadeout');
+      setTimeout(() => {
+        wrap.remove();
+        renderAIMiniPill(targetEl);
+      }, 300);
+    };
+    wrap.appendChild(skip);
+
+    targetEl.innerHTML = '';
+    targetEl.style.display = 'block';
+    targetEl.appendChild(wrap);
+  }
+
+  // ── Mini pill: collapsed state for after-skip ──
+  function renderAIMiniPill(targetEl) {
+    if (!targetEl) return;
+    const pill = document.createElement('div');
+    pill.className = 'ai-consent-mini';
+    pill.innerHTML = '<i class="bi bi-robot"></i> AI Insights Available';
+    pill.onclick = function () {
+      pill.remove();
+      // Re-open full CTA
+      _puterSkipped = false;
+      sessionStorage.removeItem('puterSkipped');
+      renderAIConsentCTA(targetEl, { onAuthed: targetEl._aiRetryFn });
+    };
+    targetEl.innerHTML = '';
+    targetEl.style.display = 'block';
+    targetEl.appendChild(pill);
+  }
+
   async function callPuterAI(systemPrompt, userPrompt) {
     try {
       // Merge system + user into one prompt so model can't ignore instructions
@@ -111,12 +244,20 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // ── Chart builders ──
+  function showChartEmpty(canvasId, wrapId, msg) {
+    const canvas = document.getElementById(canvasId);
+    if (canvas) canvas.style.display = 'none';
+    const wrap = wrapId ? document.getElementById(wrapId) : (canvas ? canvas.parentElement : null);
+    if (wrap) wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:80px;color:var(--text-muted);font-size:0.8rem;text-align:center;padding:20px;opacity:0.65;flex-direction:column;gap:6px"><span style="font-size:1.5rem">📊</span><span>' + msg + '</span></div>';
+  }
+
   function buildTrendChart(data) {
     const ctx = document.getElementById('dailyChart');
     if (!ctx) return;
     if (trendChart) trendChart.destroy();
     const goal = window.__dailyGoal || 5;
     const counts = data.map(d => d.count);
+    if (counts.every(c => c === 0)) { showChartEmpty('dailyChart', 'dailyChartWrap', 'Start logging to see your daily trend'); return; }
 
     // Calculate % reduction vs previous period (last half vs first half)
     const mid = Math.floor(counts.length / 2);
@@ -186,6 +327,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const counts = data.map(d => d.count);
     const labels = data.map(d => d.date);
+    if (counts.every(c => c === 0)) { showChartEmpty('weeklyChart', null, 'Log on multiple weeks to see comparison'); return; }
 
     // Calculate % change between consecutive weeks
     const changeLabels = data.map((d, i) => {
@@ -249,6 +391,10 @@ document.addEventListener('DOMContentLoaded', function () {
   function buildHeatmap(data) {
     const wrap = document.getElementById('heatmapWrap');
     if (!wrap) return;
+    if (!data || data.every(v => v === 0)) {
+      wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:80px;color:var(--text-muted);font-size:0.8rem;text-align:center;opacity:0.65;">Log at different times to see your peak hours</div>';
+      return;
+    }
     const maxVal = Math.max(...data, 1);
 
     // Show 6AM to 12AM (18 hours) — most relevant
@@ -290,6 +436,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const labels = data.map(d => d.day);
     const avgs = data.map(d => d.avg);
     const maxAvg = Math.max(...avgs);
+    if (maxAvg === 0) { showChartEmpty('dayOfWeekChart', 'dayOfWeekWrap', 'Log on different days to see which day is heaviest'); return; }
     const heavyIdx = avgs.indexOf(maxAvg);
     const colors = avgs.map((v, i) => {
       if (i === heavyIdx && v > 0) return 'rgba(255, 107, 107, 0.85)';
@@ -552,7 +699,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         }
 
-        const progressEl = document.getElementById('goalProgress');
+        const progressEl = null; // health timer replaces progress bar
         if (progressEl) {
           const pct = Math.min((data.todayCount / data.dailyGoal) * 100, 100);
           progressEl.style.width = pct + '%';
@@ -562,7 +709,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const feedbackPanel = document.getElementById('aiFeedbackPanel');
         const feedbackText = document.getElementById('aiFeedbackText');
         if (feedbackPanel && feedbackText) {
-          feedbackText.innerHTML = '<span class="spinner-border spinner-border-sm text-info"></span> AI analyzing...';
           feedbackPanel.style.display = 'block';
           feedbackPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -574,25 +720,58 @@ Weekly avg: ${data.weeklyAvg}/day. Trend: ${data.trend}. Peak hour: ${toAMPM(dat
 Gap since last: ${data.lastGapMinutes || '?'} min. Risk: ${data.risk.riskLevel} (${data.risk.score}/100).
 ${data.rapidRepeat ? 'RAPID REPEAT — 2 cigs within 60 min!' : ''}`;
 
-          callPuterAI(
-            `⚠️ STRICT RULES — TODHA BHI ENGLISH LIKHA TO FAIL:
+          const doSmokeFeedback = function () {
+            feedbackText.innerHTML = '<span class="spinner-border spinner-border-sm text-info"></span> AI analyzing...';
+            // Deterministic: build the exact fact + improvement for AI to rephrase
+            const overNow = data.todayCount > data.dailyGoal;
+            const atLimit = data.todayCount === data.dailyGoal;
+            const gapMin = data.lastGapMinutes || '?';
+            const cost = data.costPerCigarette || 15;
+            let smokeFact, smokeImprove, smokeTone;
+
+            if (data.rapidRepeat) {
+              smokeFact = `${gapMin} min me phir se — chain smoking ho rha`;
+              smokeImprove = 'Kam se kam 1 ghanta ruk next se pehle';
+              smokeTone = 'tough';
+            } else if (overNow) {
+              smokeFact = `Limit cross — ${data.todayCount}/${data.dailyGoal}, ${data.todayCount - data.dailyGoal} extra`;
+              smokeImprove = 'Ab aaj bilkul STOP. Ek aur nahi.';
+              smokeTone = 'tough';
+            } else if (atLimit) {
+              smokeFact = `Limit touch — ${data.todayCount}/${data.dailyGoal} ho gaye`;
+              smokeImprove = `Ab ek bhi aur nahi — ₹${cost} aur 11 min zindagi bachega`;
+              smokeTone = 'firm';
+            } else {
+              smokeFact = `Cigarette #${data.todayCount}/${data.dailyGoal}` + (data.trigger ? ` (${data.trigger})` : '') + ` — gap ${gapMin} min`;
+              smokeImprove = `${data.dailyGoal - data.todayCount} aur allowed — next ka gap badhao`;
+              smokeTone = 'firm';
+            }
+
+            callPuterAI(
+              `⚠️ STRICT RULES:
 1. SIRF Hinglish. Pure English = FAIL.
-2. SIRF 1 line. Emoji + max 12 words. Koi heading/paragraph NAHI.
-3. Koi "Based on", "I suggest" type English mat likh.
+2. EXACTLY 1 line. Max 18 words. Emoji se start kar.
+3. Neeche diya hua FACT aur IMPROVEMENT apne words me bol. Naya mat soch.
+4. ${smokeTone === 'tough' ? 'DANT laga. Gussa dikhao.' : 'Seedha bol, no diplomacy.'}
 
-Format:
-[emoji] [kya hua + pattern — Hinglish me]
+Format: [emoji] [fact] — [improvement]`,
+              `FACT: ${smokeFact}\nIMPROVEMENT: ${smokeImprove}\nTONE: ${smokeTone}`
+            ).then(advice => {
+              feedbackText.innerHTML = formatAIText(advice);
+            });
+          };
 
-Examples:
-🔥 Stress se 3rd baar aaj — gap sirf 45 min raha
-⚠️ Limit cross! ${data.dailyGoal} me se ${data.dailyGoal} — ruk ja ab
-✅ 3 ghante ka gap — badhiya pace, aise hi rakh
-
-Trigger/mood mention kar agar diya hai. 1 line, Hinglish, bas.`,
-            smokePrompt
-          ).then(advice => {
-            feedbackText.innerHTML = formatAIText(advice);
-          });
+          if (isPuterAuthed()) {
+            doSmokeFeedback();
+          } else if (_puterSkipped) {
+            // Re-offer after smoke (contextual moment) — compact CTA
+            feedbackText._aiRetryFn = doSmokeFeedback;
+            renderAIConsentCTA(feedbackText, { compact: true, onAuthed: doSmokeFeedback });
+          } else {
+            // First time — full CTA in feedback panel
+            feedbackText._aiRetryFn = doSmokeFeedback;
+            renderAIConsentCTA(feedbackText, { onAuthed: doSmokeFeedback });
+          }
         }
 
         // Update timeline
@@ -658,10 +837,10 @@ Trigger/mood mention kar agar diya hai. 1 line, Hinglish, bas.`,
     setTimeout(() => toast.classList.remove('toast-show'), 4000);
   }
 
-  // ── Craving timer (live update) ──
+  // ── Craving timer (live update) + Health Recovery milestones ──
   function startCravingTimer() {
     const el = document.getElementById('cravingTimer');
-    if (!el) return;
+    const healthEl = document.getElementById('healthTimerDisplay');
     const startTime = window.__lastSmokeTime || (window.__lastMinutesAgo !== null ? new Date(Date.now() - window.__lastMinutesAgo * 60000) : null);
     if (!startTime) return;
 
@@ -669,10 +848,30 @@ Trigger/mood mention kar agar diya hai. 1 line, Hinglish, bas.`,
       const diff = Math.floor((Date.now() - startTime.getTime()) / 60000);
       const hrs = Math.floor(diff / 60);
       const mins = diff % 60;
-      el.textContent = (hrs > 0 ? hrs + 'h ' : '') + mins + 'm';
+      const timeStr = (hrs > 0 ? hrs + 'h ' : '') + mins + 'm';
+
+      if (el) el.textContent = timeStr;
+
+      // Update health timer display
+      if (healthEl) {
+        healthEl.innerHTML = '<i class="bi bi-heart-pulse" style="font-size:1.1rem;"></i> ' + timeStr + ' smoke-free';
+      }
+
+      // Update health milestones
+      const milestones = document.querySelectorAll('.health-ms');
+      milestones.forEach(ms => {
+        const minReq = parseInt(ms.getAttribute('data-min'), 10);
+        if (diff >= minReq) {
+          ms.classList.remove('health-ms-locked');
+          ms.classList.add('health-ms-done');
+        } else {
+          ms.classList.remove('health-ms-done');
+          ms.classList.add('health-ms-locked');
+        }
+      });
     }
     update();
-    window.__cravingInterval = setInterval(update, 60000);
+    window.__cravingInterval = setInterval(update, 30000);
   }
 
   if (window.__lastMinutesAgo !== null && window.__lastMinutesAgo !== undefined) {
@@ -681,63 +880,140 @@ Trigger/mood mention kar agar diya hai. 1 line, Hinglish, bas.`,
   }
 
   // ══════════════════════════════════════
+  // ── SCORE BREAKDOWN ACCORDION ──
+  // ══════════════════════════════════════
+  window.toggleBreakdown = function () {
+    const d = document.getElementById('breakdownDetail');
+    const b = document.getElementById('breakdownToggle');
+    if (!d || !b) return;
+    const open = d.style.display !== 'none';
+    d.style.display = open ? 'none' : 'block';
+    b.textContent = open ? '▾ Score ka breakdown dekho' : '▴ Band karo';
+  };
+
+  window.toggleBreakdownAnalytics = function () {
+    const d = document.getElementById('breakdownDetailAnalytics');
+    const b = document.getElementById('breakdownToggleAnalytics');
+    if (!d || !b) return;
+    const open = d.style.display !== 'none';
+    d.style.display = open ? 'none' : 'block';
+    b.textContent = open ? '▾ Score ka breakdown dekho' : '▴ Band karo';
+  };
+
+  // ══════════════════════════════════════
   // ── DASHBOARD AI ADVICE (auto-load) ──
   // ══════════════════════════════════════
-  if (window.__dashboardData) {
+
+  // ── State machine: deterministically pick what AI should say ──
+  function pickAdviceContext(d) {
+    const gap = d.lastMinutesAgo;
+    const gapHrs = gap !== null ? Math.floor(gap / 60) : null;
+    const gapMins = gap !== null ? gap % 60 : null;
+    const gapStr = gap !== null ? (gapHrs > 0 ? gapHrs + 'h ' + gapMins + 'm' : gapMins + ' min') : null;
+    const cost = d.costPerCigarette || 15;
+    const lifeLostMin = d.totalLifetime ? d.totalLifetime * 11 : 0;
+    const lifeLostHrs = Math.round(lifeLostMin / 60);
+
+    // SITUATION: What state is the user in right now?
+    let situation, keyFact, improvement, tone;
+
+    if (d.todayCount === 0 && gap !== null && gap >= 240) {
+      situation = 'CHAMPION';
+      keyFact = `${gapStr} se nahi pee — aaj bilkul clean`;
+      improvement = 'Aise hi rakh, har minute body recover kar rhi hai';
+      tone = 'encouraging';
+    } else if (d.todayCount === 0) {
+      situation = 'CLEAN_SLATE';
+      keyFact = gap !== null ? `${gapStr} ho gaye bina peeve` : 'Aaj abhi tak ek bhi nahi';
+      improvement = 'Mat pee — sahi ja rha hai, streak mat tod';
+      tone = 'encouraging';
+    } else if (d.todayCount > d.dailyGoal) {
+      situation = 'OVER_LIMIT';
+      const overBy = d.todayCount - d.dailyGoal;
+      keyFact = `Limit cross — ${d.todayCount}/${d.dailyGoal}, ${overBy} extra pi li aaj`;
+      improvement = d.consecutiveBreach > 1
+        ? `${d.consecutiveBreach} din se lagatar over — control kar bhai`
+        : 'Ab bilkul STOP. Ek aur mat pee aaj';
+      tone = 'tough';
+    } else if (d.todayCount === d.dailyGoal) {
+      situation = 'AT_LIMIT';
+      keyFact = `Limit pe — ${d.todayCount}/${d.dailyGoal} ho gaye`;
+      improvement = 'Ab aur ek bhi nahi — ₹' + cost + ' aur 11 min zindagi bachega';
+      tone = 'firm';
+    } else if (gap !== null && gap < 30 && d.todayCount > 1) {
+      situation = 'CHAIN_SMOKING';
+      keyFact = `Sirf ${gapMins} min me phir se pi li — chain ho raha hai`;
+      improvement = 'Kam se kam 1 ghanta gap rakh next ke liye';
+      tone = 'tough';
+    } else if (gap !== null && gap >= 120) {
+      situation = 'RESISTING_LONG';
+      keyFact = `${gapStr} ho gaye — body recover kar rhi hai`;
+      improvement = d.todayCount < d.dailyGoal
+        ? `Sirf ${d.dailyGoal - d.todayCount} aur allowed — gap badhata reh`
+        : 'Mat pee, nicotine ki craving 3-5 min me chali jaegi';
+      tone = 'encouraging';
+    } else if (gap !== null && gap >= 60) {
+      situation = 'RESISTING_GOOD';
+      keyFact = `1 ghanta+ ho gaya — badhiya gap hai`;
+      improvement = 'Aur thoda rok — har minute me craving kamzor hoti hai';
+      tone = 'encouraging';
+    } else {
+      situation = 'RECENTLY_SMOKED';
+      keyFact = gap !== null ? `${gapStr} pehle pi thi — ${d.todayCount}/${d.dailyGoal} aaj` : `${d.todayCount}/${d.dailyGoal} aaj`;
+      if (d.gapTrend && d.gapTrend.changePercent < -20) {
+        improvement = `Gap chhota hota ja rha — avg ${d.gapTrend.previousAvgGap}→${d.gapTrend.currentAvgGap} min, badha isko`;
+      } else if (d.triggerTimePatterns && d.triggerTimePatterns.length > 0) {
+        const ttp = d.triggerTimePatterns[0];
+        improvement = `"${ttp.combo}" pattern ${ttp.percentage}% baar — ye time aur trigger se bach`;
+      } else if (d.triggerBreakdown && d.triggerBreakdown.dominant) {
+        improvement = `"${d.triggerBreakdown.dominant}" teri kamzori hai — isse bach`;
+      } else {
+        improvement = 'Next ek skip kar — ₹' + cost + ' bachega, 11 min zindagi badhegi';
+      }
+      tone = 'firm';
+    }
+
+    // Enrich with craving proximity warning
+    if (d.nextCraving && d.nextCraving.minutesUntil !== null && d.nextCraving.minutesUntil < 30 && d.nextCraving.confidence > 40) {
+      improvement += ` (⚡ ${d.nextCraving.minutesUntil} min me craving aayegi — ready reh)`;
+    }
+
+    return { situation, keyFact, improvement, tone };
+  }
+
+  // Extracted dashboard AI loader so it can be re-called after auth
+  function loadDashboardAI() {
     const d = window.__dashboardData;
+    if (!d) return;
     const loader = document.getElementById('dashboardAILoader');
     const textEl = document.getElementById('dashboardAIText');
 
-    // Build rich pattern context with structured flags
-    const overLimit = d.todayCount >= d.dailyGoal;
-    const pct = d.dailyGoal > 0 ? Math.round((d.todayCount / d.dailyGoal) * 100) : 0;
-    const gapInfo = d.avgGap ? `Avg gap between cigs: ${d.avgGap} min` : 'Gap data unavailable';
+    if (loader) { loader.style.display = 'block'; }
+    if (textEl) { textEl.style.display = 'none'; }
 
-    // Build detailed flag summary
-    let flagSummary = '';
-    if (d.flagsDetailed && d.flagsDetailed.length > 0) {
-      const dangerFlags = d.flagsDetailed.filter(f => f.severity === 'danger').map(f => '🔴 ' + f.text);
-      const warnFlags = d.flagsDetailed.filter(f => f.severity === 'warning').map(f => '🟡 ' + f.text);
-      const infoFlags = d.flagsDetailed.filter(f => f.severity === 'info').map(f => '🟢 ' + f.text);
-      flagSummary = [...dangerFlags, ...warnFlags, ...infoFlags].join('\n');
-    }
-
-    // Score breakdown info
-    let breakdownInfo = '';
-    if (d.scoreBreakdown) {
-      const sb = d.scoreBreakdown;
-      breakdownInfo = `Score breakdown: Limit=${sb.limit}/30, Gap=${sb.gap}/20, Trend=${sb.trend}/20, Peak=${sb.peak}/15, Behavior=${sb.behavior}/15`;
-    }
-
-    const dashPrompt = `USER'S REAL-TIME SMOKING DATA:
-• Today: ${d.todayCount}/${d.dailyGoal} cigarettes (${pct}% of limit)${overLimit ? ' — OVER LIMIT!' : ''}
-• Weekly avg: ${d.weeklyAvg}/day | Trend: ${d.trend}
-• Peak hour: ${toAMPM(d.peakHour)} | ${gapInfo}
-• Risk: ${d.riskScore}/100 (${d.riskLevel}) | ${breakdownInfo}
-• Streak under limit: ${d.streak.currentStreak} days
-• Yesterday: ${d.streak.yesterdayCount} cigs
-${d.consecutiveBreach > 0 ? '• Consecutive days over limit: ' + d.consecutiveBreach : ''}
-${d.triggerBreakdown && d.triggerBreakdown.dominant ? '• Top trigger today: ' + d.triggerBreakdown.dominant + ' (' + d.triggerBreakdown.percentage + '%)' : ''}
-${d.gapTrend && d.gapTrend.currentAvgGap ? '• Gap trend: ' + d.gapTrend.previousAvgGap + '→' + d.gapTrend.currentAvgGap + ' min (' + d.gapTrend.changePercent + '%)' : ''}
-${flagSummary ? '• Behavior Flags:\n' + flagSummary : ''}
-Abhi ka time: ${new Date().toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:true})}`;
+    // Use deterministic state to constrain AI
+    const ctx = pickAdviceContext(d);
+    const toneMap = {
+      tough: 'Tu ek strict bhai hai. DANT laga. No mercy. Roka nahi toh bigdega.',
+      firm: 'Tu serious coach hai. Seedha bol, koi diplomacy nahi.',
+      encouraging: 'Tu supportive bhai hai. Tareef kar, hausla badha. Mat peene ko bol.'
+    };
 
     callPuterAI(
-      `⚠️ STRICT RULES — TODHA BHI ENGLISH LIKHA TO FAIL:
-1. SIRF Hinglish. Pure English = FAIL.
-2. SIRF 1 line. Emoji + max 12 words. Koi heading/paragraph NAHI.
-3. Koi "Based on", "Your data shows" type English mat likh.
+      `⚠️ STRICT RULES:
+1. SIRF Hinglish (Hindi in English script). Pure English = FAIL.
+2. EXACTLY 1 line. Max 18 words. Emoji se start kar.
+3. Koi "Based on", "I recommend" type English NAHI.
+4. Neeche jo FACT aur IMPROVEMENT diya hai, WOHI bol apne words me. Naya kuch invent mat kar.
+5. ${toneMap[ctx.tone] || toneMap.firm}
 
-Format:
-[emoji] [pattern] — [tip]
+Output format: [emoji] [rephrased fact] — [rephrased improvement]
 
 Examples:
-🕐 ${toAMPM(d.peakHour)} pe sabse zyada peeta hai — walk pe ja
-📉 Hafte me 30% kam hua — gap aur badhao
-⚠️ Aaj limit cross — ab ruk ja bhai
-
-Exact numbers data se utha. 1 line, Hinglish, bas.`,
-      dashPrompt
+💪 2 ghante se nahi pee — sahi ja rha hai, mat tod
+🔥 Limit cross 4/3 — ab STOP, ek aur nahi
+⏱️ 45 min ka gap — chhota hai, 1 ghanta target rakh`,
+      `FACT: ${ctx.keyFact}\nIMPROVEMENT: ${ctx.improvement}\nTONE: ${ctx.tone}\nSITUATION: ${ctx.situation}`
     ).then(advice => {
       if (loader) loader.style.display = 'none';
       if (textEl) {
@@ -748,6 +1024,31 @@ Exact numbers data se utha. 1 line, Hinglish, bas.`,
     });
   }
 
+  // Dashboard AI: gate with auth check
+  if (window.__dashboardData) {
+    const loader = document.getElementById('dashboardAILoader');
+    const textEl = document.getElementById('dashboardAIText');
+
+    if (isPuterAuthed()) {
+      // Already authed → load AI immediately
+      loadDashboardAI();
+    } else if (_puterSkipped) {
+      // User previously skipped → show mini pill
+      if (loader) loader.style.display = 'none';
+      if (textEl) {
+        textEl._aiRetryFn = loadDashboardAI;
+        renderAIMiniPill(textEl);
+      }
+    } else {
+      // First time → show full CTA
+      if (loader) loader.style.display = 'none';
+      if (textEl) {
+        textEl._aiRetryFn = loadDashboardAI;
+        renderAIConsentCTA(textEl, { onAuthed: loadDashboardAI });
+      }
+    }
+  }
+
   // ══════════════════════════════════════
   // ── ANALYTICS AI INSIGHT (Puter.js) ──
   // ══════════════════════════════════════
@@ -755,9 +1056,38 @@ Exact numbers data se utha. 1 line, Hinglish, bas.`,
     const loader = document.getElementById('aiAnalyticsLoader');
     const text = document.getElementById('aiAnalyticsText');
     const btn = document.getElementById('refreshAIBtn');
+
+    // Auth gate for analytics AI
+    if (!isPuterAuthed()) {
+      if (loader) loader.style.display = 'none';
+      if (btn) btn.disabled = false;
+      if (text) {
+        text._aiRetryFn = window.loadAnalyticsAI;
+        if (_puterSkipped) {
+          renderAIConsentCTA(text, { compact: true, onAuthed: window.loadAnalyticsAI });
+        } else {
+          renderAIConsentCTA(text, { onAuthed: window.loadAnalyticsAI });
+        }
+      }
+      return;
+    }
+
     if (loader) loader.style.display = 'block';
     if (text) text.style.display = 'none';
     if (btn) btn.disabled = true;
+
+    // Helper: ensure .ai-text child exists (may have been replaced by auth CTA)
+    function ensureAITextChild() {
+      if (!text) return null;
+      let p = text.querySelector('.ai-text');
+      if (!p) {
+        p = document.createElement('div');
+        p.className = 'ai-text';
+        text.appendChild(p);
+      }
+      return p;
+    }
+
     try {
       // Fetch raw analytics data from server
       const res = await fetch('/api/analytics/ai');
@@ -766,49 +1096,75 @@ Exact numbers data se utha. 1 line, Hinglish, bas.`,
       if (d.insight) {
         // Server returned an error message
         if (text) {
-          const p = text.querySelector('.ai-text');
+          const p = ensureAITextChild();
           if (p) p.innerHTML = formatAIText(d.insight);
           text.style.display = 'block';
         }
         return;
       }
 
-      const analyticsPrompt = `DATA:
-Avg: ${d.weeklyAvg}/day | Peak: ${toAMPM(d.peakHour)} | Trend: ${d.trend}
+      const analyticsPrompt = `SMOKING BEHAVIOR DATA (analyse ALL of this):
+═══ TODAY ═══
+Today: ${d.todayCount} cigarettes (goal: ${d.dailyGoal}) | Last cig: ${d.lastMinutesAgo != null ? d.lastMinutesAgo + ' min ago' : 'N/A'}
+Rapid repeat (chain): ${d.rapidRepeat ? 'YES' : 'No'}
+
+═══ RISK SCORE ═══
+Risk: ${d.riskScore}/100 (${d.riskLevel}) | Breakdown: Limit=${d.scoreBreakdown?.limit || 0}/30, Gap=${d.scoreBreakdown?.gap || 0}/20, Trend=${d.scoreBreakdown?.trend || 0}/20, Peak=${d.scoreBreakdown?.peak || 0}/15, Behavior=${d.scoreBreakdown?.behavior || 0}/15
+Flags: ${d.flagsSummary || 'none'}
+
+═══ PATTERNS (14 DAYS) ═══
+Daily: ${d.dailySummary}
+Avg: ${d.weeklyAvg}/day | Trend direction: ${d.weightedTrend?.direction || d.trend} (${d.weightedTrend?.percentChange || 0}% change, recent avg ${d.weightedTrend?.recentAvg || '?'} vs older ${d.weightedTrend?.olderAvg || '?'})
+Peak hour: ${toAMPM(d.peakHour)} | Hourly: ${d.hourlyBreakdown || 'N/A'}
+Day-of-week avg: ${d.dowSummary || 'N/A'}
+Consecutive limit breach days: ${d.consecutiveBreach || 0}
+
+═══ GAPS ═══
+Avg gap: ${d.avgGap || '?'} min
+Gap trend: current avg ${d.gapTrend?.currentAvgGap || '?'} min vs previous ${d.gapTrend?.previousAvgGap || '?'} min (${d.gapTrend?.changePercent || 0}% change)
+
+═══ TRIGGERS + MOODS ═══
 Triggers: ${d.topTriggers || 'none'} | Moods: ${d.topMoods || 'none'}
-7 days: ${d.dailySummary}
-Gap: ${d.avgGap || '?'} min | Total: ${d.totalLifetime}
-${d.hourlyBreakdown ? 'Hours: ' + d.hourlyBreakdown : ''}`;
+Trigger-time combos: ${d.triggerTimeSummary || 'none'}
+
+═══ STREAKS + LIFETIME ═══
+Under-limit streak: current ${d.streak?.current || 0} days, best ${d.streak?.best || 0} days
+Total lifetime: ${d.totalLifetime} cigarettes | Cost/cig: ₹${d.costPerCig}`;
 
       const insight = await callPuterAI(
-        `⚠️ STRICT RULES — TODHA BHI ENGLISH LIKHA TO FAIL:
-1. SIRF Hinglish (Hindi words English script me). Pure English = FAIL.
-2. SIRF 3 lines. Har line me emoji + max 10 words. Koi heading, paragraph, bullet, explanation NAHI.
-3. Koi "Based on", "Here is", "Interpretation", "Recommendation" type English mat likh.
+        `Tu ek smoking behavior analyst hai. User ka COMPLETE data diya hai. Tera kaam: data me DEEP patterns dhundh ke user ko batana ki uska behavior kaisa hai.
 
-Format (exactly copy kar, sirf numbers/words change kar):
-🕐 [X AM/PM] tera peak time — yahi danger zone
-🔥 [trigger] se sabse zyada craving — [X] baar
-📊 [deep pattern insight — jaise gap trend, kab zyada peeta, kaunsa din heavy]
+⚠️ STRICT RULES:
+1. SIRF Hinglish (Hindi in English script). Pure English = FAIL.
+2. Exactly 5 lines likho. Har line emoji se start. Max 12-15 words per line.
+3. Koi "Based on", "Here is", "I recommend" type filler NAHI.
+4. SIRF data se dekh ke exact observations likho — koi generic gyaan mat de.
 
-3rd line me SIRF pattern/analysis likho. Koi suggestion/tip/exercise/bahar niklo type bakwas NAHI. Sirf data se pattern nikalo.
+FORMAT (exactly 5 lines):
+Line 1: 🔍 Overall behavior summary — improving/worsening/stable + kyu (data se)
+Line 2: ⚡ Sabse bada risk factor kya hai abhi — limit/gap/trend/trigger jo bhi highest score contribute kare
+Line 3: 📊 Pattern insight — kaunsa din/time/trigger combination sabse dangerous hai
+Line 4: 📉 Gap/trend analysis — gaps badh rahe ya chhote ho rahe, trend kahan ja raha
+Line 5: 💡 Ek specific actionable insight — data based, generic nahi (e.g. "Mon 2PM habit trigger avoid kar" not "paani pee")
 
 Example output:
-🕐 1PM tera peak time — yahi danger zone
-🔥 habit se sabse zyada craving — 2 baar
-📊 weekend pe 2x zyada peeta hai weekday se
+🔍 Behavior bigad raha — last 3 din me avg 7→9 cigarettes
+⚡ Gap bahut chhota — 25 min avg, chain smoking pattern ban raha
+📊 Mon+Tue 11AM-2PM habit trigger se 60% smoking hoti
+📉 Gaps 30% se chhote hue last week — control loose ho raha
+💡 Tue 1PM pe habit trigger aata — us time 15 min walk try kar
 
-Bas itna hi likho. 3 lines. Koi aur text mat do.`,
+Bas 5 lines. Koi aur text, heading, bullet, explanation NAHI.`,
         analyticsPrompt
       );
       if (text) {
-        const p = text.querySelector('.ai-text');
+        const p = ensureAITextChild();
         if (p) p.innerHTML = formatAIText(insight);
         text.style.display = 'block';
       }
     } catch (err) {
       if (text) {
-        const p = text.querySelector('.ai-text');
+        const p = ensureAITextChild();
         if (p) p.innerHTML = formatAIText('Failed to load insight.');
         text.style.display = 'block';
       }
@@ -817,6 +1173,34 @@ Bas itna hi likho. 3 lines. Koi aur text mat do.`,
       if (btn) btn.disabled = false;
     }
   };
+
+  // ── Social proof nudge rotation ──
+  const socialProofTips = [
+    'After 20 min bina peeve — heart rate aur blood pressure normal ho jaata hai.',
+    'Ek cigarette skip karo = 11 min extra zindagi. Science says.',
+    'Craving sirf 3-5 min rehti hai. Usse zyada khud tabhi rehti hai jab tum sochte raho.',
+    '90% ex-smokers ne cold turkey chodha — willpower hi sabse bada tool hai.',
+    'Pehle 3 din sabse mushkil. Day 4 se nicotine withdrawal 50% kam ho jaata hai.',
+    'Stress se cigarette lena stress nahi hatata — CO2 badha ke anxiety aur badhata hai.',
+    'Ek deep breath = 6 sec — itna kaafi hai craving ko weak karne ke liye.',
+    '1 saal baad heart disease risk ek smoker ka aadha ho jaata hai.',
+    'Paani peena craving ko fast-forward karta hai — try karo.',
+    '5 min walk ya 10 pushups — dopamine uthta hai bina cigarette ke.'
+  ];
+
+  const spEl = document.getElementById('socialProofText');
+  if (spEl) {
+    let spIdx = Math.floor(Math.random() * socialProofTips.length);
+    spEl.textContent = socialProofTips[spIdx];
+    setInterval(() => {
+      spIdx = (spIdx + 1) % socialProofTips.length;
+      spEl.style.opacity = '0';
+      setTimeout(() => {
+        spEl.textContent = socialProofTips[spIdx];
+        spEl.style.opacity = '1';
+      }, 400);
+    }, 12000);
+  }
 
   // Ripple animation
   const style = document.createElement('style');

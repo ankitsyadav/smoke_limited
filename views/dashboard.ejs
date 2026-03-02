@@ -11,39 +11,53 @@
 <div class="page-content">
 
 <!-- Risk Badge with Explanation -->
-<div class="text-center mb-2 fade-in">
+<div class="text-center mb-3 fade-in">
   <div class="risk-orb risk-<%= risk.riskLevel.toLowerCase() %>">
     <span class="risk-score"><%= risk.score %></span>
     <span class="risk-label"><%= risk.riskLevel %></span>
   </div>
   <div class="risk-explain">
-    <small>Relapse Risk Score</small>
-    <div class="risk-bar-wrap">
+    <small style="font-size:0.7rem;color:var(--text-muted);">Relapse Risk Score</small>
+    <!-- Always-visible 0→100 scale bar -->
+    <div class="risk-bar-wrap" style="margin-top:6px;">
       <div class="risk-bar-fill" style="width:<%= risk.score %>%;"></div>
     </div>
     <div class="risk-explain-row">
-      <span class="re-safe">0 Safe</span>
+      <span class="re-safe">0 🟢 Safe</span>
       <span class="re-mid">50</span>
-      <span class="re-danger">100 Danger</span>
+      <span class="re-danger">Danger 🔴 100</span>
     </div>
+    <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Jitna kam score, utna better 👍</div>
   </div>
-  <!-- Score Breakdown Mini Bar -->
+
+  <!-- Score Breakdown Mini Bar + Accordion -->
   <% if (risk.scoreBreakdown) { %>
   <div class="score-breakdown-wrap">
     <div class="score-breakdown-bar">
       <% const sb = risk.scoreBreakdown; %>
-      <% if (sb.limit > 0) { %><div class="sb-seg sb-limit" style="width:<%= sb.limit %>%" title="Limit: <%= sb.limit %>"></div><% } %>
-      <% if (sb.gap > 0) { %><div class="sb-seg sb-gap" style="width:<%= sb.gap %>%" title="Gap: <%= sb.gap %>"></div><% } %>
-      <% if (sb.trend > 0) { %><div class="sb-seg sb-trend" style="width:<%= sb.trend %>%" title="Trend: <%= sb.trend %>"></div><% } %>
-      <% if (sb.peak > 0) { %><div class="sb-seg sb-peak" style="width:<%= sb.peak %>%" title="Peak: <%= sb.peak %>"></div><% } %>
-      <% if (sb.behavior > 0) { %><div class="sb-seg sb-behavior" style="width:<%= sb.behavior %>%" title="Behavior: <%= sb.behavior %>"></div><% } %>
+      <% if (sb.limit > 0) { %><div class="sb-seg sb-limit" style="width:<%= sb.limit %>%"></div><% } %>
+      <% if (sb.gap > 0) { %><div class="sb-seg sb-gap" style="width:<%= sb.gap %>%"></div><% } %>
+      <% if (sb.trend > 0) { %><div class="sb-seg sb-trend" style="width:<%= sb.trend %>%"></div><% } %>
+      <% if (sb.peak > 0) { %><div class="sb-seg sb-peak" style="width:<%= sb.peak %>%"></div><% } %>
+      <% if (sb.behavior > 0) { %><div class="sb-seg sb-behavior" style="width:<%= sb.behavior %>%"></div><% } %>
     </div>
-    <div class="score-breakdown-legend">
-      <% if (sb.limit > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-limit"></span>Limit <%= sb.limit %></span><% } %>
-      <% if (sb.gap > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-gap"></span>Gap <%= sb.gap %></span><% } %>
-      <% if (sb.trend > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-trend"></span>Trend <%= sb.trend %></span><% } %>
-      <% if (sb.peak > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-peak"></span>Peak <%= sb.peak %></span><% } %>
-      <% if (sb.behavior > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-behavior"></span>Behavior <%= sb.behavior %></span><% } %>
+    <button id="breakdownToggle" onclick="toggleBreakdown()" style="background:none;border:none;color:var(--text-muted);font-size:0.65rem;margin-top:4px;cursor:pointer;padding:0;">▾ Score ka breakdown dekho</button>
+    <div id="breakdownDetail" style="display:none;text-align:left;margin-top:6px;">
+      <% if (sb.limit > 0) { %>
+      <div class="bd-row"><span class="sb-dot sb-limit"></span><div><div class="bd-label">🎯 Limit — <strong><%= sb.limit %></strong>/30</div><div class="bd-desc">Aaj kitni cigarettes pi vs apna target</div></div></div>
+      <% } %>
+      <% if (sb.gap > 0) { %>
+      <div class="bd-row"><span class="sb-dot sb-gap"></span><div><div class="bd-label">⏱️ Cigarettes ka gap — <strong><%= sb.gap %></strong>/20</div><div class="bd-desc">Cigarettes ke beech ka time kitna chhota tha</div></div></div>
+      <% } %>
+      <% if (sb.trend > 0) { %>
+      <div class="bd-row"><span class="sb-dot sb-trend"></span><div><div class="bd-label">📈 Pichle dino ka pattern — <strong><%= sb.trend %></strong>/20</div><div class="bd-desc">Last week se smoking badh rahi hai ya kam</div></div></div>
+      <% } %>
+      <% if (sb.peak > 0) { %>
+      <div class="bd-row"><span class="sb-dot sb-peak"></span><div><div class="bd-label">🕐 Peak time — <strong><%= sb.peak %></strong>/15</div><div class="bd-desc">Abhi tera sabse heavy smoking time kitna paas hai</div></div></div>
+      <% } %>
+      <% if (sb.behavior > 0) { %>
+      <div class="bd-row"><span class="sb-dot sb-behavior"></span><div><div class="bd-label">⚡ Aaj ka behaviour — <strong><%= sb.behavior %></strong>/15</div><div class="bd-desc">Chain smoking ya baar baar same trigger se pee raha</div></div></div>
+      <% } %>
     </div>
   </div>
   <% } %>
@@ -88,18 +102,64 @@
   </div>
 </div>
 
-<!-- Progress Bar -->
-<div class="glass-card mb-3 fade-in" style="padding:10px 16px;">
-  <div class="d-flex justify-content-between mb-1" style="font-size:0.75rem;">
-    <span style="color:var(--text-muted);"><%= todayCount %>/<%= settings.dailyGoal %> cigarettes</span>
-    <span style="color:<%= todayCount > settings.dailyGoal ? 'var(--accent-red)' : 'var(--olive-light)' %>;">
-      <%= Math.min(Math.round((todayCount / settings.dailyGoal) * 100), 100) %>%
-    </span>
+<!-- Health Recovery Timer -->
+<div class="glass-card mb-3 fade-in health-timer-card" style="padding:12px 16px;">
+  <div class="text-center">
+    <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Your body is healing</div>
+    <div id="healthTimerDisplay" style="font-size:1.5rem;font-weight:700;color:var(--olive-light);">
+      <% if (streak.lastMinutesAgo !== null) { %>
+        <% const hh = Math.floor(streak.lastMinutesAgo / 60); const mm = streak.lastMinutesAgo % 60; %>
+        <i class="bi bi-heart-pulse" style="font-size:1.1rem;"></i>
+        <%= hh > 0 ? hh + 'h ' : '' %><%= mm %>m smoke-free
+      <% } else { %>
+        <i class="bi bi-heart-pulse"></i> Start your journey
+      <% } %>
+    </div>
   </div>
-  <div class="progress" style="height:8px;">
-    <div class="progress-bar bg-olive" id="goalProgress" style="width:<%= Math.min((todayCount / settings.dailyGoal) * 100, 100) %>%"></div>
+  <div class="health-milestones" id="healthMilestones">
+    <%
+      const milestones = [
+        { min: 20, label: 'Heart rate normal', icon: '❤️', desc: '20 min' },
+        { min: 120, label: 'Nicotine leaving blood', icon: '🩸', desc: '2 hrs' },
+        { min: 480, label: 'Oxygen levels normal', icon: '🫁', desc: '8 hrs' },
+        { min: 1440, label: 'Heart attack risk ↓', icon: '💪', desc: '24 hrs' },
+        { min: 2880, label: 'Taste & smell return', icon: '👃', desc: '48 hrs' }
+      ];
+      const gapMin = streak.lastMinutesAgo || 0;
+    %>
+    <% milestones.forEach(function(m) { %>
+      <div class="health-ms <%= gapMin >= m.min ? 'health-ms-done' : 'health-ms-locked' %>" data-min="<%= m.min %>">
+        <span class="health-ms-icon"><%= m.icon %></span>
+        <span class="health-ms-text"><%= m.desc %></span>
+      </div>
+    <% }); %>
   </div>
 </div>
+
+<!-- ⚡ Craving Prediction -->
+<% if (nextCraving && nextCraving.nextLikelyHour !== null) { %>
+<div class="glass-card mb-3 fade-in" style="padding:10px 14px;">
+  <div class="d-flex align-items-center gap-2">
+    <span style="font-size:1.3rem;">⚡</span>
+    <div style="flex:1;">
+      <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Next craving likely</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--olive-light);">
+        <% const nH = nextCraving.nextLikelyHour % 12 || 12; const nS = nextCraving.nextLikelyHour >= 12 ? 'PM' : 'AM'; %>
+        ~<%= nH %><%= nS %>
+        <% if (nextCraving.minutesUntil !== null && nextCraving.minutesUntil > 0) { %>
+          <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">(<%= nextCraving.minutesUntil < 60 ? nextCraving.minutesUntil + ' min' : Math.floor(nextCraving.minutesUntil/60) + 'h ' + (nextCraving.minutesUntil%60) + 'm' %> me)</span>
+        <% } %>
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:0.6rem;color:var(--text-muted);"><%= nextCraving.confidence %>% sure</div>
+      <div style="width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.1);margin-top:2px;">
+        <div style="width:<%= nextCraving.confidence %>%;height:100%;border-radius:2px;background:<%= nextCraving.confidence > 60 ? '#ff6b6b' : nextCraving.confidence > 30 ? '#ffd93d' : 'var(--olive-light)' %>;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <!-- I Smoked Button -->
 <div class="text-center mb-3 fade-in">
@@ -270,9 +330,14 @@
 </div>
 <% } %>
 
-<!-- ═══ BOTTOM: Money Burned ═══ -->
+<!-- ═══ BOTTOM: Money & Life Lost ═══ -->
 <div class="glass-card mb-3 fade-in" style="padding:12px 16px;">
-  <h6 class="card-title mb-2"><i class="bi bi-fire"></i> 🔥 Paisa Jalaya</h6>
+  <h6 class="card-title mb-2"><i class="bi bi-fire"></i> 🔥 Har Cigarette Ki Keemat</h6>
+  <!-- Per cigarette loss -->
+  <div class="text-center mb-3" style="padding:8px;border-radius:10px;background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.15);">
+    <div style="font-size:1rem;font-weight:700;color:#ff6b6b;">₹<%= settings.costPerCigarette %> + 11 min zindagi</div>
+    <div style="font-size:0.65rem;color:var(--text-muted);">har ek cigarette me itna jaata hai</div>
+  </div>
   <div class="d-flex justify-content-between text-center">
     <div>
       <div style="font-size:1.1rem;font-weight:700;color:var(--olive-light);">₹<%= financials.monthlyCost %></div>
@@ -287,36 +352,121 @@
       <div style="font-size:0.65rem;color:var(--text-muted);">Lifetime</div>
     </div>
   </div>
+  <% if (financials.lifetimeCigarettes > 0) { %>
+  <div class="text-center mt-2" style="padding:6px;border-radius:8px;background:rgba(255,217,61,0.08);">
+    <div style="font-size:0.8rem;font-weight:600;color:#ffd93d;">⏳ <%= Math.round(financials.lifetimeCigarettes * 11 / 60) %> hours of life lost</div>
+    <div style="font-size:0.6rem;color:var(--text-muted);">
+      <%= financials.lifetimeCigarettes %> cigarettes × 11 min (WHO estimate)
+    </div>
+  </div>
+  <% } %>
 </div>
 
-<!-- Behavior Trend Flags -->
+<!-- Behavior Insights Pills -->
 <% if (risk.flags.length > 0) { %>
 <div class="glass-card mb-3 fade-in">
-  <h6 class="card-title"><i class="bi bi-activity"></i> Behavior Insights</h6>
-  <div class="behavior-flags-wrap">
+  <h6 class="card-title"><i class="bi bi-activity"></i> Aaj Ka Haal</h6>
+  <div style="display:flex;flex-direction:column;gap:8px;">
     <% risk.flags.forEach(function(f) { %>
-      <div class="behavior-flag behavior-flag-<%= f.severity %>">
-        <div class="bf-icon-wrap">
-          <i class="bi bi-<%= f.icon %>"></i>
-        </div>
-        <div class="bf-content">
-          <div class="bf-text"><%= f.text %></div>
-          <div class="bf-meta">
-            <span class="bf-category"><%= f.category %></span>
-            <% if (f.trend === 'worsening') { %>
-              <span class="bf-trend bf-trend-bad">↗ worsening</span>
-            <% } else if (f.trend === 'improving') { %>
-              <span class="bf-trend bf-trend-good">↘ improving</span>
-            <% } else { %>
-              <span class="bf-trend bf-trend-neutral">→ stable</span>
-            <% } %>
-          </div>
-        </div>
+    <%
+      // Plain Hindi text map by category
+      var pillEmoji = f.severity === 'danger' ? '🔴' : f.severity === 'warning' ? '🟡' : '🟢';
+      var pillBg = f.severity === 'danger' ? 'rgba(255,70,70,0.1)' : f.severity === 'warning' ? 'rgba(255,217,61,0.1)' : 'rgba(107,255,107,0.08)';
+      var pillBorder = f.severity === 'danger' ? 'rgba(255,70,70,0.25)' : f.severity === 'warning' ? 'rgba(255,217,61,0.25)' : 'rgba(107,255,107,0.2)';
+      var pillColor = f.severity === 'danger' ? '#ff6b6b' : f.severity === 'warning' ? '#ffd93d' : 'var(--accent-green)';
+      var categoryLabel = f.category === 'limit' ? '🎯 Limit' : f.category === 'gap' ? '⏱️ Gap' : f.category === 'trend' ? '📈 Trend' : f.category === 'pattern' ? '🕐 Peak Time' : f.category === 'trigger' ? '⚡ Trigger' : '💡 Behaviour';
+      var trendLabel = f.trend === 'worsening' ? '↑ Badh raha' : f.trend === 'improving' ? '↓ Sudhar raha' : '→ Same hai';
+    %>
+    <div style="background:<%= pillBg %>;border:1px solid <%= pillBorder %>;border-radius:10px;padding:10px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <span style="font-size:0.65rem;font-weight:700;color:<%= pillColor %>;text-transform:uppercase;letter-spacing:0.5px;"><%= categoryLabel %></span>
+        <span style="font-size:0.6rem;color:var(--text-muted);"><%= trendLabel %></span>
       </div>
+      <div style="font-size:0.8rem;color:var(--text-primary);line-height:1.4;"><%= pillEmoji %> <%= f.text %></div>
+    </div>
     <% }); %>
   </div>
 </div>
 <% } %>
+
+<!-- ═══ Trigger × Time Patterns ═══ -->
+<% if (triggerTimePatterns && triggerTimePatterns.length > 0) { %>
+<div class="glass-card mb-3 fade-in" style="padding:12px 16px;">
+  <h6 class="card-title" style="font-size:0.8rem;"><i class="bi bi-lightning-charge"></i> Trigger × Time Patterns</h6>
+  <% triggerTimePatterns.forEach(function(ttp) { %>
+  <div class="d-flex align-items-center justify-content-between mb-1" style="font-size:0.75rem;">
+    <span style="color:var(--olive-light);font-weight:600;"><%= ttp.combo %></span>
+    <div class="d-flex align-items-center gap-2">
+      <div style="width:60px;height:6px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;">
+        <div style="height:100%;width:<%= ttp.percentage %>%;background:<%= ttp.percentage > 40 ? '#ff6b6b' : 'var(--olive-light)' %>;border-radius:3px;"></div>
+      </div>
+      <span style="color:var(--text-muted);font-size:0.65rem;min-width:28px;text-align:right;"><%= ttp.percentage %>%</span>
+    </div>
+  </div>
+  <% }); %>
+  <div style="font-size:0.6rem;color:var(--text-muted);margin-top:6px;">⚠️ Ye sabse frequent trigger+time combos hain — in situations me alert raho</div>
+</div>
+<% } %>
+
+<!-- ═══ Next Craving Prediction ═══ -->
+<% if (nextCraving && nextCraving.confidence > 0) { %>
+<div class="glass-card mb-3 fade-in" style="padding:12px 16px;">
+  <div class="d-flex align-items-center gap-2 mb-1">
+    <span style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">⚡ Craving Prediction</span>
+    <span style="font-size:0.65rem;padding:2px 8px;border-radius:20px;background:rgba(107,143,113,0.15);color:var(--olive-light);"><%= nextCraving.confidence %>% confident</span>
+  </div>
+  <div style="font-size:1rem;font-weight:700;color:var(--olive-light);">
+    <% if (nextCraving.minutesUntil !== null && nextCraving.minutesUntil > 0) { %>
+      <% const nhrs = Math.floor(nextCraving.minutesUntil / 60); const nmins = nextCraving.minutesUntil % 60; %>
+      <i class="bi bi-clock-history"></i>
+      Next craving in ~<%= nhrs > 0 ? nhrs + 'h ' : '' %><%= nmins %>m
+    <% } else { %>
+      <i class="bi bi-exclamation-circle"></i> High risk window now
+    <% } %>
+  </div>
+  <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">
+    <% const nHour = nextCraving.nextLikelyHour; const nAmPm = nHour >= 12 ? (nHour === 12 ? '12PM' : (nHour-12) + 'PM') : (nHour === 0 ? '12AM' : nHour + 'AM'); %>
+    Based on your pattern — peak at <%= nAmPm %>
+  </div>
+</div>
+<% } %>
+
+<!-- ═══ Achievements ═══ -->
+<% if (achievements && (achievements.timeMilestones.length > 0 || achievements.streakMilestones.length > 0)) { %>
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-trophy"></i> Achievements</h6>
+  <div class="achievements-grid" id="achievementsGrid">
+    <% achievements.timeMilestones.forEach(function(m) { %>
+      <div class="achievement-badge <%= m.unlocked ? 'badge-unlocked' : 'badge-locked' %>" title="<%= m.label %>">
+        <span class="ach-icon"><%= m.icon %></span>
+        <span class="ach-label"><%= m.label %></span>
+      </div>
+    <% }); %>
+    <% achievements.streakMilestones.forEach(function(m) { %>
+      <div class="achievement-badge <%= m.unlocked ? 'badge-unlocked' : 'badge-locked' %>" title="<%= m.label %>">
+        <span class="ach-icon"><%= m.icon %></span>
+        <span class="ach-label"><%= m.label %></span>
+      </div>
+    <% }); %>
+  </div>
+  <% if (achievements.gapRecord && achievements.gapRecord > 0) { %>
+  <div style="font-size:0.7rem;color:var(--text-muted);text-align:center;margin-top:8px;">
+    🏅 Best gap: <%= Math.floor(achievements.gapRecord / 60) > 0 ? Math.floor(achievements.gapRecord / 60) + 'h ' : '' %><%= achievements.gapRecord % 60 %>m between cigarettes
+  </div>
+  <% } %>
+</div>
+<% } %>
+
+<!-- ═══ Social Proof Nudge ═══ -->
+<div class="glass-card mb-3 fade-in social-proof-card" id="socialProofCard">
+  <div class="d-flex align-items-start gap-2">
+    <span style="font-size:1.2rem;">💡</span>
+    <div>
+      <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Did you know?</div>
+      <div id="socialProofText" class="social-proof-text">Loading...</div>
+    </div>
+  </div>
+</div>
 
 <!-- AI Advice (loaded client-side via Puter.js) -->
 <div class="glass-card ai-card mb-3 fade-in">
@@ -349,7 +499,13 @@
     triggerBreakdown: risk.triggerBreakdown,
     gapTrend: risk.gapTrend,
     streak: { currentStreak: streak.currentStreak, todayCount: streak.todayCount, yesterdayCount: streak.yesterdayCount },
-    dailyGoal: settings.dailyGoal
+    dailyGoal: settings.dailyGoal,
+    costPerCigarette: settings.costPerCigarette,
+    totalLifetime: financials.lifetimeCigarettes,
+    lastMinutesAgo: streak.lastMinutesAgo,
+    nextCraving: nextCraving,
+    triggerTimePatterns: triggerTimePatterns,
+    achievements: achievements
   }) %>;
 </script>
 

@@ -4,7 +4,6 @@ const SmokeLog = require('../models/SmokeLog');
 const UserSettings = require('../models/UserSettings');
 const patternService = require('../services/patternService');
 const predictionService = require('../services/predictionService');
-const emailService = require('../services/emailService');
 
 // AJAX endpoint — returns JSON, AI feedback handled client-side via Puter.js
 exports.logSmokeAjax = async (req, res) => {
@@ -47,36 +46,6 @@ exports.logSmokeAjax = async (req, res) => {
 
     const todayStart = moment().startOf('day').toDate();
 
-    // Send email if risk is HIGH (non-blocking)
-    try {
-      if (risk.riskLevel === 'HIGH') {
-        await emailService.sendAlertEmail(userId, risk, 'Your risk level is HIGH. Try to pause and do some deep breathing.');
-      }
-    } catch (alertErr) {
-      console.error('[ALERT] Non-fatal:', alertErr.message);
-    }
-
-    // Send pattern insight email (non-blocking, 4hr cooldown inside)
-    try {
-      const hourlyDist = await patternService.getHourlyDistribution(userId, 30, createdAt);
-      const triggerDist = await patternService.getTriggerDistribution(userId, 30, createdAt);
-      const topTriggerEntry = Object.entries(triggerDist).sort((a, b) => b[1] - a[1])[0];
-      const topTrigger = topTriggerEntry ? `${topTriggerEntry[0]} (${topTriggerEntry[1]}x)` : '';
-
-      emailService.sendPatternEmail(userId, {
-        todayCount,
-        dailyGoal: settings ? settings.dailyGoal : 5,
-        peakHour,
-        weeklyAvg: weeklyAvg.toFixed(1),
-        trend,
-        topTrigger,
-        avgGap: lastGapMinutes,
-        hourlyBreakdown: hourlyDist
-      });
-    } catch (patternErr) {
-      console.error('[PATTERN-EMAIL] Non-fatal:', patternErr.message);
-    }
-
     // Get today's timeline
     const todayLogs = await SmokeLog.find({
       userId, timestamp: { $gte: todayStart, $lte: moment().endOf('day').toDate() }
@@ -101,6 +70,7 @@ exports.logSmokeAjax = async (req, res) => {
       rapidRepeat,
       trigger: trigger || '',
       mood: mood || '',
+      costPerCigarette: settings ? settings.costPerCigarette : 15,
       timeline
     });
   } catch (err) {

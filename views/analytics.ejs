@@ -10,6 +10,90 @@
 <div class="page-content">
 <h5 class="text-center mb-3 fade-in" style="color:var(--olive-light);"><i class="bi bi-graph-up"></i> Analytics</h5>
 
+<!-- ═══ KPI Summary Cards ═══ -->
+<div class="row g-2 mb-3">
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val" style="font-size:1.2rem;color:var(--olive-light);"><%= weeklyAvg %></div>
+      <div class="mini-lbl">📊 Avg/Day</div>
+    </div>
+  </div>
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val" style="font-size:1.2rem;color:<%= underLimitPct >= 70 ? 'var(--accent-green)' : underLimitPct >= 40 ? 'var(--accent-yellow)' : 'var(--accent-red)' %>;"><%= underLimitPct %>%</div>
+      <div class="mini-lbl">✅ In Limit</div>
+    </div>
+  </div>
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val" style="font-size:1.2rem;">
+        <% if (avgGap) { %>
+          <% const gH = Math.floor(avgGap / 60); const gM = avgGap % 60; %>
+          <span style="color:var(--olive-light);"><%= gH > 0 ? gH + 'h' : '' %><%= gM %>m</span>
+        <% } else { %>--<% } %>
+      </div>
+      <div class="mini-lbl">⏱️ Avg Gap</div>
+    </div>
+  </div>
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val" style="font-size:1.2rem;color:<%= weightedTrend.direction === 'improving' ? 'var(--accent-green)' : weightedTrend.direction === 'worsening' ? 'var(--accent-red)' : 'var(--accent-yellow)' %>;">
+        <% if (weightedTrend.direction === 'improving') { %>📉 ↓<%= Math.abs(weightedTrend.percentChange) %>%
+        <% } else if (weightedTrend.direction === 'worsening') { %>📈 ↑<%= weightedTrend.percentChange %>%
+        <% } else { %>➡️ Same<% } %>
+      </div>
+      <div class="mini-lbl">Trend</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Insight Badges Row ═══ -->
+<div class="row g-2 mb-3">
+  <% if (bestDay) { %>
+  <div class="col-6 fade-in">
+    <div class="glass-card" style="padding:10px 14px;">
+      <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">🏆 Best Day</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--accent-green);"><%= bestDay.date %> — <%= bestDay.count %> cigs</div>
+    </div>
+  </div>
+  <% } %>
+  <% if (worstDay) { %>
+  <div class="col-6 fade-in">
+    <div class="glass-card" style="padding:10px 14px;">
+      <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">💀 Worst Day</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--accent-red);"><%= worstDay.date %> — <%= worstDay.count %> cigs</div>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<% if (Number(dailySaved) > 0) { %>
+<div class="glass-card mb-3 fade-in" style="padding:10px 14px;border:1px solid rgba(107,255,107,0.15);background:rgba(107,255,107,0.04);">
+  <div class="d-flex align-items-center gap-2">
+    <span style="font-size:1.3rem;">💰</span>
+    <div>
+      <div style="font-size:0.85rem;font-weight:700;color:var(--accent-green);">₹<%= dailySaved %>/day saved from reducing</div>
+      <div style="font-size:0.6rem;color:var(--text-muted);">Pehle avg <%= weightedTrend.olderAvg %>/day → ab <%= weightedTrend.recentAvg %>/day</div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<!-- Gap Trend Insight -->
+<% if (gapTrend.currentAvgGap !== null && gapTrend.previousAvgGap !== null) { %>
+<div class="glass-card mb-3 fade-in" style="padding:10px 14px;">
+  <div class="d-flex align-items-center gap-2">
+    <span style="font-size:1.3rem;"><%= gapTrend.changePercent > 0 ? '🟢' : gapTrend.changePercent < 0 ? '🔴' : '🟡' %></span>
+    <div>
+      <div style="font-size:0.8rem;font-weight:600;color:<%= gapTrend.changePercent > 0 ? 'var(--accent-green)' : gapTrend.changePercent < 0 ? 'var(--accent-red)' : 'var(--accent-yellow)' %>;">
+        Gap <%= gapTrend.changePercent > 0 ? 'badh raha ↑' : gapTrend.changePercent < 0 ? 'chhota ho raha ↓' : 'same hai' %> — <%= Math.abs(gapTrend.changePercent) %>%
+      </div>
+      <div style="font-size:0.6rem;color:var(--text-muted);">Avg gap: <%= gapTrend.previousAvgGap %> min → <%= gapTrend.currentAvgGap %> min</div>
+    </div>
+  </div>
+</div>
+<% } %>
+
 <!-- Range Dropdown -->
 <div class="glass-card mb-3 fade-in" style="padding:10px 16px;">
   <div class="d-flex align-items-center justify-content-between">
@@ -37,7 +121,7 @@
     <h6 class="card-title mb-0" id="trendTitle">Last 7 Days</h6>
     <span class="badge" id="trendBadge" style="font-size:0.7rem;"></span>
   </div>
-  <div style="position:relative;height:240px;width:100%;">
+  <div id="dailyChartWrap" style="position:relative;height:240px;width:100%;">
     <canvas id="dailyChart"></canvas>
   </div>
   <div class="d-flex justify-content-center gap-3 mt-2" style="font-size:0.7rem;">
@@ -55,9 +139,9 @@
   <div id="weeklyChangeLabel" class="text-center mt-2" style="font-size:0.8rem;font-weight:600;"></div>
 </div>
 
-<!-- Smoking Heatmap (Time of Day) -->
+<!-- Smoking Heatmap (Hourly) -->
 <div class="glass-card mb-3 fade-in">
-  <h6 class="card-title"><i class="bi bi-grid-3x3"></i> Smoking Heatmap</h6>
+  <h6 class="card-title"><i class="bi bi-grid-3x3"></i> Kab Zyada Peeta Hai? <small style="font-size:0.65rem;font-weight:400;color:var(--text-muted);">(hourly)</small></h6>
   <div id="heatmapWrap" style="overflow-x:auto;"></div>
   <div class="d-flex justify-content-between mt-2" style="font-size:0.65rem;color:var(--text-muted);">
     <span>🟢 Low</span><span>🟡 Medium</span><span>🔴 High</span>
@@ -70,10 +154,10 @@
     <h6 class="card-title mb-0"><i class="bi bi-calendar-week"></i> Kaunsa Din Heavy?</h6>
     <span class="badge" id="heavyDayBadge" style="font-size:0.7rem;"></span>
   </div>
-  <div style="position:relative;height:220px;width:100%;">
+  <div id="dayOfWeekWrap" style="position:relative;height:220px;width:100%;">
     <canvas id="dayOfWeekChart"></canvas>
   </div>
-  <div class="text-center mt-1" style="font-size:0.65rem;color:var(--text-muted);">Avg cigarettes per day (last 30 days)</div>
+  <div class="text-center mt-1" style="font-size:0.65rem;color:var(--text-muted);">Avg cigarettes per day of week</div>
 </div>
 
 <!-- Trigger & Mood Distribution -->
@@ -96,34 +180,65 @@
   </div>
 </div>
 
-<!-- AI Analytics Insight -->
+<!-- Trigger × Time Patterns -->
+<% if (triggerTimePatterns && triggerTimePatterns.length > 0) { %>
+<div class="glass-card mb-3 fade-in" style="padding:12px 16px;">
+  <h6 class="card-title" style="font-size:0.8rem;"><i class="bi bi-lightning-charge"></i> Trigger × Time Patterns</h6>
+  <% triggerTimePatterns.forEach(function(ttp) { %>
+  <div class="d-flex align-items-center justify-content-between mb-2" style="font-size:0.75rem;">
+    <span style="color:var(--olive-light);font-weight:600;"><%= ttp.combo %></span>
+    <div class="d-flex align-items-center gap-2">
+      <div style="width:80px;height:7px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;">
+        <div style="height:100%;width:<%= ttp.percentage %>%;background:<%= ttp.percentage > 40 ? '#ff6b6b' : 'var(--olive-light)' %>;border-radius:4px;transition:width 0.6s;"></div>
+      </div>
+      <span style="color:var(--text-muted);font-size:0.65rem;min-width:32px;text-align:right;"><%= ttp.count %>× (<%= ttp.percentage %>%)</span>
+    </div>
+  </div>
+  <% }); %>
+</div>
+<% } %>
+
+<!-- AI Behavior Analysis -->
 <div class="glass-card ai-card mb-3 fade-in">
   <div class="d-flex align-items-center justify-content-between mb-2">
-    <h6 class="card-title mb-0"><i class="bi bi-robot"></i> AI Analytics Insight</h6>
+    <h6 class="card-title mb-0"><i class="bi bi-robot"></i> AI Behavior Analysis</h6>
     <button class="ai-refresh-btn" id="refreshAIBtn" onclick="loadAnalyticsAI()">
       <i class="bi bi-arrow-clockwise"></i>
     </button>
   </div>
-  <div class="ai-badge"><i class="bi bi-stars"></i> GPT-4.1 Powered</div>
+  <div class="ai-badge"><i class="bi bi-stars"></i> GPT-4.1 — Full Data Analysis</div>
   <div id="aiAnalyticsLoader" style="display:none;" class="ai-loader-wrap">
     <div class="spinner-border spinner-border-sm"></div>
-    <small>Analyzing patterns...</small>
+    <small>Tera poora data analyze ho raha...</small>
   </div>
   <div id="aiAnalyticsText" class="ai-text-glow">
-    <div class="ai-text">Tap the refresh button to generate AI insights from your data.</div>
+    <div class="ai-text" style="font-size:0.78rem;line-height:1.7;">Loading behavior analysis...</div>
   </div>
 </div>
 
 <!-- Financial Summary -->
 <div class="glass-card mb-3 fade-in">
-  <h6 class="card-title"><i class="bi bi-cash-stack"></i> Financial Summary</h6>
-  <table class="table table-dark table-sm mb-0" style="background:transparent;">
-    <tr><td>Monthly Cost</td><td class="text-end fw-bold" style="color:var(--olive-light);">₹<%= financials.monthlyCost %></td></tr>
-    <tr><td>Yearly Cost</td><td class="text-end fw-bold" style="color:var(--olive-light);">₹<%= financials.yearlyCost %></td></tr>
-    <tr><td>Lifetime Cigarettes</td><td class="text-end fw-bold" style="color:var(--olive-light);"><%= financials.lifetimeCigarettes %></td></tr>
-    <tr><td>Lifetime Cost</td><td class="text-end fw-bold" style="color:#ff6b6b;">₹<%= financials.lifetimeCost %></td></tr>
-  </table>
+  <h6 class="card-title"><i class="bi bi-cash-stack"></i> Paisa Report</h6>
+  <div class="row g-2 text-center mb-2">
+    <div class="col-4">
+      <div style="font-size:1.1rem;font-weight:700;color:var(--olive-light);">₹<%= financials.monthlyCost %></div>
+      <div style="font-size:0.6rem;color:var(--text-muted);">Monthly</div>
+    </div>
+    <div class="col-4">
+      <div style="font-size:1.1rem;font-weight:700;color:#ffd93d;">₹<%= financials.yearlyCost %></div>
+      <div style="font-size:0.6rem;color:var(--text-muted);">Yearly</div>
+    </div>
+    <div class="col-4">
+      <div style="font-size:1.1rem;font-weight:700;color:#ff6b6b;">₹<%= financials.lifetimeCost %></div>
+      <div style="font-size:0.6rem;color:var(--text-muted);">Lifetime</div>
+    </div>
+  </div>
+  <div class="text-center" style="padding:6px;border-radius:8px;background:rgba(255,217,61,0.08);">
+    <div style="font-size:0.75rem;font-weight:600;color:#ffd93d;">⏳ <%= Math.round(totalLifetime * 11 / 60) %> hours of life lost</div>
+    <div style="font-size:0.55rem;color:var(--text-muted);"><%= totalLifetime %> cigarettes × 11 min (WHO estimate)</div>
+  </div>
 </div>
+
 
 <script>
   window.__daily7 = <%- daily7 %>;
@@ -133,6 +248,13 @@
   window.__weekly4 = <%- weekly4 %>;
   window.__dayOfWeek = <%- dayOfWeek %>;
   window.__dailyGoal = <%= dailyGoal %>;
+
+  // Auto-load AI behavior analysis on page visit
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof window.loadAnalyticsAI === 'function') {
+      setTimeout(function() { window.loadAnalyticsAI(); }, 600);
+    }
+  });
 </script>
 
 </div><!-- /page-content -->
