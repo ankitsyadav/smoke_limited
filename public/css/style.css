@@ -902,6 +902,35 @@ input[type="time"].input-dark {
 }
 
 /* ══════════════════════════════
+   SMOKING HEATMAP
+   ══════════════════════════════ */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+}
+.heatmap-cell {
+  border-radius: 8px;
+  text-align: center;
+  padding: 6px 2px;
+  min-width: 32px;
+  transition: transform 0.2s;
+}
+.heatmap-cell:hover {
+  transform: scale(1.15);
+  z-index: 2;
+}
+.hm-hour {
+  font-size: 0.6rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.hm-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* ══════════════════════════════
    TODAY'S TIMELINE
    ══════════════════════════════ */
 .timeline-wrap {

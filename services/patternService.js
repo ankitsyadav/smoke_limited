@@ -270,6 +270,32 @@ async function getDailySummary(userId, days = 7, createdAt) {
   return counts.map(d => `${d.date}: ${d.count}`).join(', ');
 }
 
+// ── Day of Week distribution ──
+async function getDayOfWeekDistribution(userId, days = 30, createdAt) {
+  const maxDays = Math.min(days, daysSinceCreation(createdAt));
+  const since = clampStart(moment().subtract(maxDays, 'days').startOf('day').toDate(), createdAt);
+  const logs = await SmokeLog.find({ userId, timestamp: { $gte: since } });
+  // 0=Mon, 1=Tue, ... 6=Sun (isoWeekday: 1=Mon to 7=Sun)
+  const buckets = Array(7).fill(0);
+  const dayCounts = Array(7).fill(0); // count of each weekday in the range
+  for (let i = 0; i < maxDays; i++) {
+    const d = moment().subtract(i, 'days');
+    const wd = d.isoWeekday() - 1; // 0=Mon ... 6=Sun
+    dayCounts[wd]++;
+  }
+  logs.forEach(log => {
+    const wd = moment(log.timestamp).isoWeekday() - 1;
+    buckets[wd]++;
+  });
+  // Return average per day-of-week for fair comparison
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return labels.map((lbl, i) => ({
+    day: lbl,
+    total: buckets[i],
+    avg: dayCounts[i] > 0 ? parseFloat((buckets[i] / dayCounts[i]).toFixed(1)) : 0
+  }));
+}
+
 module.exports = {
   getHourlyDistribution,
   getPeakHour,
@@ -289,5 +315,6 @@ module.exports = {
   getTriggerDistribution,
   getMoodDistribution,
   getStreakData,
-  getDailySummary
+  getDailySummary,
+  getDayOfWeekDistribution
 };

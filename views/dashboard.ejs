@@ -29,17 +29,11 @@
   </div>
 </div>
 
-<!-- Streak & Comparison -->
+<!-- ═══ TOP: Today Count / Target / % vs Yesterday ═══ -->
 <div class="row g-2 mb-3">
   <div class="col-4 fade-in">
     <div class="stat-card mini-stat">
-      <div class="mini-val"><%= streak.currentStreak %></div>
-      <div class="mini-lbl">Day Streak</div>
-    </div>
-  </div>
-  <div class="col-4 fade-in">
-    <div class="stat-card mini-stat">
-      <div class="mini-val">
+      <div class="mini-val" style="font-size:1.6rem;">
         <% if (todayCount < settings.dailyGoal) { %>
           <span style="color:var(--accent-green);" id="limitIcon">✓</span>
         <% } else if (todayCount === settings.dailyGoal) { %>
@@ -47,21 +41,43 @@
         <% } else { %>
           <span style="color:var(--accent-red);" id="limitIcon">✗</span>
         <% } %>
-        <span id="todayLimitDisplay"><%= todayCount %>/<%= settings.dailyGoal %></span>
+        <span id="todayCountDisplay"><%= todayCount %></span>
       </div>
-      <div class="mini-lbl">Today/Limit</div>
+      <div class="mini-lbl">🔢 Today</div>
     </div>
   </div>
   <div class="col-4 fade-in">
     <div class="stat-card mini-stat">
-      <div class="mini-val" id="cravingTimer">
-        <% if (streak.lastMinutesAgo !== null) { %>
-          <% const hrs = Math.floor(streak.lastMinutesAgo / 60); const mins = streak.lastMinutesAgo % 60; %>
-          <%= hrs > 0 ? hrs + 'h ' : '' %><%= mins %>m
-        <% } else { %>--<% } %>
+      <div class="mini-val" style="font-size:1.6rem;">
+        <span id="todayLimitDisplay"><%= settings.dailyGoal %></span>
       </div>
-      <div class="mini-lbl">Since Last</div>
+      <div class="mini-lbl">🎯 Target</div>
     </div>
+  </div>
+  <div class="col-4 fade-in">
+    <div class="stat-card mini-stat">
+      <% 
+        const ydayCount = streak.yesterdayCount || 0;
+        const vsYday = ydayCount > 0 ? Math.round(((todayCount - ydayCount) / ydayCount) * 100) : 0;
+      %>
+      <div class="mini-val" style="font-size:1.3rem;color:<%= vsYday < 0 ? 'var(--accent-green)' : vsYday > 0 ? 'var(--accent-red)' : 'var(--accent-yellow)' %>;">
+        <%= vsYday > 0 ? '+' : '' %><%= vsYday %>%
+      </div>
+      <div class="mini-lbl">📉 vs Yesterday</div>
+    </div>
+  </div>
+</div>
+
+<!-- Progress Bar -->
+<div class="glass-card mb-3 fade-in" style="padding:10px 16px;">
+  <div class="d-flex justify-content-between mb-1" style="font-size:0.75rem;">
+    <span style="color:var(--text-muted);"><%= todayCount %>/<%= settings.dailyGoal %> cigarettes</span>
+    <span style="color:<%= todayCount > settings.dailyGoal ? 'var(--accent-red)' : 'var(--olive-light)' %>;">
+      <%= Math.min(Math.round((todayCount / settings.dailyGoal) * 100), 100) %>%
+    </span>
+  </div>
+  <div class="progress" style="height:8px;">
+    <div class="progress-bar bg-olive" id="goalProgress" style="width:<%= Math.min((todayCount / settings.dailyGoal) * 100, 100) %>%"></div>
   </div>
 </div>
 
@@ -171,45 +187,46 @@
   </div>
 </div>
 
-<!-- Today Stats -->
+<!-- ═══ MIDDLE: Quick Stats Row ═══ -->
 <div class="row g-2 mb-3">
-  <div class="col-6 fade-in">
-    <div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-hash"></i></div>
-      <div class="stat-value" id="todayCountDisplay"><%= todayCount %></div>
-      <div class="stat-label">Today</div>
-      <div class="progress mt-2" style="height:6px;">
-        <div class="progress-bar bg-olive" id="goalProgress" style="width:<%= Math.min((todayCount / settings.dailyGoal) * 100, 100) %>%"></div>
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val"><%= streak.currentStreak %></div>
+      <div class="mini-lbl">🔥 Streak</div>
+    </div>
+  </div>
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val" id="cravingTimer">
+        <% if (streak.lastMinutesAgo !== null) { %>
+          <% const hrs = Math.floor(streak.lastMinutesAgo / 60); const mins = streak.lastMinutesAgo % 60; %>
+          <%= hrs > 0 ? hrs + 'h ' : '' %><%= mins %>m
+        <% } else { %>--<% } %>
       </div>
-      <small class="text-muted">Goal: <%= settings.dailyGoal %></small>
+      <div class="mini-lbl">⏱️ Gap</div>
     </div>
   </div>
-  <div class="col-6 fade-in">
-    <div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-clock"></i></div>
-      <div class="stat-value"><%= peakHour %>:00</div>
-      <div class="stat-label">Peak Hour</div>
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val">
+        <% const pkH = peakHour % 12 || 12; const pkSuffix = peakHour >= 12 ? 'PM' : 'AM'; %>
+        <%= pkH %><small><%= pkSuffix %></small>
+      </div>
+      <div class="mini-lbl">⏰ Peak</div>
     </div>
   </div>
-  <div class="col-6 fade-in">
-    <div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-arrow-repeat"></i></div>
-      <div class="stat-value"><%= avgGap || '--' %></div>
-      <div class="stat-label">Avg Gap (min)</div>
-    </div>
-  </div>
-  <div class="col-6 fade-in">
-    <div class="stat-card">
-      <div class="stat-value">
+  <div class="col-3 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val">
         <% if (trend === 'improving') { %>
-          <span class="badge bg-success"><i class="bi bi-arrow-down"></i> Improving</span>
+          <span style="color:var(--accent-green);font-size:0.75rem;">📉 Down</span>
         <% } else if (trend === 'worsening') { %>
-          <span class="badge bg-danger"><i class="bi bi-arrow-up"></i> Worsening</span>
+          <span style="color:var(--accent-red);font-size:0.75rem;">📈 Up</span>
         <% } else { %>
-          <span class="badge bg-warning"><i class="bi bi-dash"></i> Stable</span>
+          <span style="color:var(--accent-yellow);font-size:0.75rem;">➡️ Same</span>
         <% } %>
       </div>
-      <div class="stat-label">7-Day Trend</div>
+      <div class="mini-lbl">Trend</div>
     </div>
   </div>
 </div>
@@ -233,20 +250,21 @@
 </div>
 <% } %>
 
-<!-- Financial Cards -->
-<div class="row g-2 mb-3">
-  <div class="col-6 fade-in">
-    <div class="stat-card money-card">
-      <div class="stat-icon"><i class="bi bi-cash"></i></div>
-      <div class="stat-value">₹<%= financials.monthlyCost %></div>
-      <div class="stat-label">Monthly Cost</div>
+<!-- ═══ BOTTOM: Money Burned ═══ -->
+<div class="glass-card mb-3 fade-in" style="padding:12px 16px;">
+  <h6 class="card-title mb-2"><i class="bi bi-fire"></i> 🔥 Paisa Jalaya</h6>
+  <div class="d-flex justify-content-between text-center">
+    <div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--olive-light);">₹<%= financials.monthlyCost %></div>
+      <div style="font-size:0.65rem;color:var(--text-muted);">Month</div>
     </div>
-  </div>
-  <div class="col-6 fade-in">
-    <div class="stat-card money-card">
-      <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
-      <div class="stat-value">₹<%= financials.yearlyCost %></div>
-      <div class="stat-label">Yearly Cost</div>
+    <div>
+      <div style="font-size:1.1rem;font-weight:700;color:#ffd93d;">₹<%= financials.yearlyCost %></div>
+      <div style="font-size:0.65rem;color:var(--text-muted);">Year</div>
+    </div>
+    <div>
+      <div style="font-size:1.1rem;font-weight:700;color:#ff6b6b;">₹<%= financials.lifetimeCost %></div>
+      <div style="font-size:0.65rem;color:var(--text-muted);">Lifetime</div>
     </div>
   </div>
 </div>
@@ -254,7 +272,7 @@
 <!-- Rapid Repeat Warning -->
 <% if (rapidRepeat) { %>
 <div class="alert alert-warning glass-card mb-3 fade-in" style="border-left:4px solid #ffd93d;">
-  <i class="bi bi-exclamation-triangle"></i> <strong>RAPID REPEAT!</strong> Two cigarettes within 60 minutes. Try to slow down.
+  <i class="bi bi-exclamation-triangle"></i> <strong>RAPID REPEAT!</strong> 60 min ke andar 2 cigarettes — thoda slow karo bhai.
 </div>
 <% } %>
 

@@ -27,13 +27,13 @@ document.addEventListener('DOMContentLoaded', function () {
   };
 
   const rangeTitles = {
-    daily: { trend: 'Last 7 Days', hourly: 'Hourly Distribution (7 Days)' },
-    weekly: { trend: 'Last 12 Weeks', hourly: 'Hourly Distribution (12 Weeks)' },
-    monthly: { trend: 'Last 12 Months', hourly: 'Hourly Distribution (12 Months)' },
-    yearly: { trend: 'Last 5 Years', hourly: 'Hourly Distribution (All Time)' }
+    daily: { trend: 'Last 7 Days' },
+    weekly: { trend: 'Last 12 Weeks' },
+    monthly: { trend: 'Last 12 Months' },
+    yearly: { trend: 'Last 5 Years' }
   };
 
-  let trendChart = null, hourlyChart = null, triggerChartObj = null, moodChartObj = null;
+  let trendChart = null, dayOfWeekChart = null, triggerChartObj = null, moodChartObj = null, weeklyChart = null;
 
   // ══════════════════════════════════════
   // ── PUTER.JS AI HELPER (FREE GPT) ──
@@ -115,45 +115,221 @@ document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('dailyChart');
     if (!ctx) return;
     if (trendChart) trendChart.destroy();
+    const goal = window.__dailyGoal || 5;
+    const counts = data.map(d => d.count);
+
+    // Calculate % reduction vs previous period (last half vs first half)
+    const mid = Math.floor(counts.length / 2);
+    const firstHalf = counts.slice(0, mid);
+    const secondHalf = counts.slice(mid);
+    const avgFirst = firstHalf.length > 0 ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : 0;
+    const avgSecond = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : 0;
+    const pctChange = avgFirst > 0 ? Math.round(((avgSecond - avgFirst) / avgFirst) * 100) : 0;
+
+    const badge = document.getElementById('trendBadge');
+    if (badge) {
+      if (pctChange < 0) {
+        badge.textContent = `🟢 ${Math.abs(pctChange)}% kam vs last week`;
+        badge.style.background = 'rgba(107,255,107,0.15)';
+        badge.style.color = '#6bff6b';
+      } else if (pctChange > 0) {
+        badge.textContent = `🔴 +${pctChange}% badha vs last week`;
+        badge.style.background = 'rgba(255,107,107,0.15)';
+        badge.style.color = '#ff6b6b';
+      } else {
+        badge.textContent = `🟡 Same as last week`;
+        badge.style.background = 'rgba(255,217,61,0.15)';
+        badge.style.color = '#ffd93d';
+      }
+    }
+
     trendChart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: data.map(d => d.date),
-        datasets: [{
-          data: data.map(d => d.count),
-          borderColor: olive, backgroundColor: 'rgba(107, 143, 113, 0.15)',
-          borderWidth: 2.5, fill: true, tension: 0.4,
-          pointBackgroundColor: oliveLight, pointBorderColor: oliveDark,
-          pointRadius: data.length > 20 ? 2 : 5, pointHoverRadius: 8,
-          pointHoverBackgroundColor: '#fff', pointHoverBorderColor: olive, pointHoverBorderWidth: 3
-        }]
+        datasets: [
+          {
+            label: 'Cigarettes',
+            data: counts,
+            borderColor: olive, backgroundColor: 'rgba(107, 143, 113, 0.15)',
+            borderWidth: 2.5, fill: true, tension: 0.4,
+            pointBackgroundColor: oliveLight, pointBorderColor: oliveDark,
+            pointRadius: data.length > 20 ? 2 : 5, pointHoverRadius: 8,
+            pointHoverBackgroundColor: '#fff', pointHoverBorderColor: olive, pointHoverBorderWidth: 3
+          },
+          {
+            label: 'Target',
+            data: Array(data.length).fill(goal),
+            borderColor: '#ff6b6b', borderWidth: 2, borderDash: [8, 4],
+            pointRadius: 0, fill: false, tension: 0
+          }
+        ]
       },
-      options: chartDefaults
+      options: {
+        ...chartDefaults,
+        plugins: { legend: { display: false } },
+        scales: {
+          ...chartDefaults.scales,
+          y: {
+            ...chartDefaults.scales.y,
+            ticks: { ...chartDefaults.scales.y.ticks, stepSize: 1, callback: v => Number.isInteger(v) ? v : '' }
+          }
+        }
+      }
     });
   }
 
-  function buildHourlyChart(data) {
-    const ctx = document.getElementById('hourlyChart');
+  function buildWeeklyChart(data) {
+    const ctx = document.getElementById('weeklyChart');
     if (!ctx) return;
-    if (hourlyChart) hourlyChart.destroy();
-    const labels = Array.from({length: 24}, (_, i) => i + ':00');
-    const maxVal = Math.max(...data);
-    const colors = data.map(v => {
-      const ratio = maxVal > 0 ? v / maxVal : 0;
-      if (ratio > 0.8) return 'rgba(255, 107, 107, 0.8)';
-      if (ratio > 0.5) return 'rgba(255, 217, 61, 0.7)';
+    if (weeklyChart) weeklyChart.destroy();
+
+    const counts = data.map(d => d.count);
+    const labels = data.map(d => d.date);
+
+    // Calculate % change between consecutive weeks
+    const changeLabels = data.map((d, i) => {
+      if (i === 0) return '';
+      const prev = counts[i - 1];
+      if (prev === 0) return counts[i] > 0 ? '+∞' : '0%';
+      const pct = Math.round(((counts[i] - prev) / prev) * 100);
+      return pct > 0 ? `+${pct}%` : `${pct}%`;
+    });
+
+    // Color bars based on trend
+    const colors = data.map((d, i) => {
+      if (i === 0) return 'rgba(107, 143, 113, 0.7)';
+      return counts[i] <= counts[i - 1] ? 'rgba(107, 255, 107, 0.6)' : 'rgba(255, 107, 107, 0.6)';
+    });
+
+    weeklyChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: colors,
+          borderColor: colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
+          borderWidth: 1, borderRadius: 8, borderSkipped: false
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: (ctx) => changeLabels[ctx.dataIndex] ? `Change: ${changeLabels[ctx.dataIndex]}` : ''
+            }
+          }
+        },
+        scales: {
+          ...chartDefaults.scales,
+          y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, stepSize: 1, callback: v => Number.isInteger(v) ? v : '' } }
+        }
+      }
+    });
+
+    // Show change label
+    const changeEl = document.getElementById('weeklyChangeLabel');
+    if (changeEl && counts.length >= 2) {
+      const last = counts[counts.length - 1];
+      const prev = counts[counts.length - 2];
+      const pct = prev > 0 ? Math.round(((last - prev) / prev) * 100) : 0;
+      if (pct < 0) {
+        changeEl.innerHTML = `<span style="color:#6bff6b;">🟢 ${Math.abs(pct)}% kam pichle hafte se</span>`;
+      } else if (pct > 0) {
+        changeEl.innerHTML = `<span style="color:#ff6b6b;">🔴 +${pct}% relapse spike</span>`;
+      } else {
+        changeEl.innerHTML = `<span style="color:#ffd93d;">🟡 Same as last week</span>`;
+      }
+    }
+  }
+
+  function buildHeatmap(data) {
+    const wrap = document.getElementById('heatmapWrap');
+    if (!wrap) return;
+    const maxVal = Math.max(...data, 1);
+
+    // Show 6AM to 12AM (18 hours) — most relevant
+    const startHr = 6, endHr = 24;
+    let html = '<div class="heatmap-grid">';
+
+    for (let h = startHr; h < endHr; h++) {
+      const count = data[h] || 0;
+      const ratio = count / maxVal;
+      let bg, textColor;
+      if (count === 0) {
+        bg = 'rgba(107, 143, 113, 0.08)';
+        textColor = '#555';
+      } else if (ratio > 0.7) {
+        bg = `rgba(255, 70, 70, ${0.5 + ratio * 0.4})`;
+        textColor = '#fff';
+      } else if (ratio > 0.3) {
+        bg = `rgba(255, 200, 50, ${0.3 + ratio * 0.4})`;
+        textColor = '#1a1a2e';
+      } else {
+        bg = `rgba(107, 200, 113, ${0.2 + ratio * 0.3})`;
+        textColor = '#e0e0e0';
+      }
+
+      const ampm = h >= 12 ? (h === 12 ? '12P' : (h - 12) + 'P') : (h === 0 ? '12A' : h + 'A');
+      html += `<div class="heatmap-cell" style="background:${bg};color:${textColor};" title="${ampm}: ${count} cigs">
+        <div class="hm-hour">${ampm}</div>
+        <div class="hm-count">${count}</div>
+      </div>`;
+    }
+    html += '</div>';
+    wrap.innerHTML = html;
+  }
+
+  function buildDayOfWeekChart(data) {
+    const ctx = document.getElementById('dayOfWeekChart');
+    if (!ctx) return;
+    if (dayOfWeekChart) dayOfWeekChart.destroy();
+    const labels = data.map(d => d.day);
+    const avgs = data.map(d => d.avg);
+    const maxAvg = Math.max(...avgs);
+    const heavyIdx = avgs.indexOf(maxAvg);
+    const colors = avgs.map((v, i) => {
+      if (i === heavyIdx && v > 0) return 'rgba(255, 107, 107, 0.85)';
+      const ratio = maxAvg > 0 ? v / maxAvg : 0;
+      if (ratio > 0.7) return 'rgba(255, 217, 61, 0.75)';
       return 'rgba(107, 143, 113, 0.6)';
     });
-    hourlyChart = new Chart(ctx, {
+    const badge = document.getElementById('heavyDayBadge');
+    if (badge && maxAvg > 0) {
+      badge.textContent = '🔥 ' + labels[heavyIdx] + ' sabse heavy';
+      badge.style.background = 'rgba(255,107,107,0.2)';
+      badge.style.color = '#ff6b6b';
+    }
+    dayOfWeekChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels, datasets: [{
-          data, backgroundColor: colors,
+          label: 'Avg / day',
+          data: avgs,
+          backgroundColor: colors,
           borderColor: colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
-          borderWidth: 1, borderRadius: 6, borderSkipped: false
+          borderWidth: 1, borderRadius: 8, borderSkipped: false
         }]
       },
-      options: { ...chartDefaults, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, ticks: { color: tickColor, font: { size: 8 }, maxRotation: 45 } } } }
+      options: {
+        ...chartDefaults,
+        scales: {
+          ...chartDefaults.scales,
+          x: { ...chartDefaults.scales.x, ticks: { color: tickColor, font: { size: 10 } } },
+          y: { ...chartDefaults.scales.y, title: { display: true, text: 'Avg cigarettes', color: tickColor, font: { size: 9 } } }
+        },
+        plugins: {
+          ...chartDefaults.plugins,
+          tooltip: {
+            callbacks: {
+              label: function(ctx) { return 'Avg: ' + ctx.parsed.y.toFixed(1) + ' / day'; }
+            }
+          }
+        }
+      }
     });
   }
 
@@ -188,7 +364,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ── Initial render ──
   if (window.__daily7) buildTrendChart(window.__daily7);
-  if (window.__hourly) buildHourlyChart(window.__hourly);
+  if (window.__hourly) buildHeatmap(window.__hourly);
+  if (window.__dayOfWeek) buildDayOfWeekChart(window.__dayOfWeek);
+  if (window.__weekly4) buildWeeklyChart(window.__weekly4);
 
   const triggerColors = ['#ff6b6b', '#ffd93d', '#6bff6b', '#6bb5ff', '#ff6bff', '#ffaa6b', '#6bffd9', '#d96bff'];
   const moodColors = ['#ff6b6b', '#ffaa6b', '#ffd93d', '#6bff6b', '#6bb5ff', '#d96bff', '#ff6bff', '#6bffd9'];
@@ -208,11 +386,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const data = await res.json();
         const t = rangeTitles[range];
         const tt = document.getElementById('trendTitle');
-        const ht = document.getElementById('hourlyTitle');
         if (tt) tt.textContent = t.trend;
-        if (ht) ht.textContent = t.hourly;
         buildTrendChart(data.trendData);
-        buildHourlyChart(data.hourly);
+        buildHeatmap(data.hourly);
+        if (data.weekly4) buildWeeklyChart(data.weekly4);
       } catch (err) { console.error('Analytics fetch error:', err); }
       finally { if (loader) loader.style.display = 'none'; }
     });

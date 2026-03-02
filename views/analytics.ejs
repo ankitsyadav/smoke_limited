@@ -31,20 +31,49 @@
   <small style="color:var(--text-muted);margin-left:6px;">Loading...</small>
 </div>
 
-<!-- Trend Line Chart -->
+<!-- Trend Line Chart with Target Line + % Reduction -->
 <div class="glass-card mb-3 fade-in">
-  <h6 class="card-title" id="trendTitle">Last 7 Days</h6>
-  <div style="position:relative;height:220px;width:100%;">
+  <div class="d-flex align-items-center justify-content-between mb-1">
+    <h6 class="card-title mb-0" id="trendTitle">Last 7 Days</h6>
+    <span class="badge" id="trendBadge" style="font-size:0.7rem;"></span>
+  </div>
+  <div style="position:relative;height:240px;width:100%;">
     <canvas id="dailyChart"></canvas>
+  </div>
+  <div class="d-flex justify-content-center gap-3 mt-2" style="font-size:0.7rem;">
+    <span style="color:var(--olive-light);">● Cigarettes/Day</span>
+    <span style="color:#ff6b6b;">┅ Daily Target (<%= dailyGoal %>)</span>
   </div>
 </div>
 
-<!-- Hourly Distribution Bar Chart -->
+<!-- Weekly Comparison Bar Chart -->
 <div class="glass-card mb-3 fade-in">
-  <h6 class="card-title" id="hourlyTitle">Hourly Distribution (7 Days)</h6>
+  <h6 class="card-title"><i class="bi bi-bar-chart"></i> Weekly Comparison</h6>
   <div style="position:relative;height:220px;width:100%;">
-    <canvas id="hourlyChart"></canvas>
+    <canvas id="weeklyChart"></canvas>
   </div>
+  <div id="weeklyChangeLabel" class="text-center mt-2" style="font-size:0.8rem;font-weight:600;"></div>
+</div>
+
+<!-- Smoking Heatmap (Time of Day) -->
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-grid-3x3"></i> Smoking Heatmap</h6>
+  <div id="heatmapWrap" style="overflow-x:auto;"></div>
+  <div class="d-flex justify-content-between mt-2" style="font-size:0.65rem;color:var(--text-muted);">
+    <span>🟢 Low</span><span>🟡 Medium</span><span>🔴 High</span>
+  </div>
+</div>
+
+<!-- Kaunsa Din Heavy? (Day of Week) -->
+<div class="glass-card mb-3 fade-in">
+  <div class="d-flex align-items-center justify-content-between mb-1">
+    <h6 class="card-title mb-0"><i class="bi bi-calendar-week"></i> Kaunsa Din Heavy?</h6>
+    <span class="badge" id="heavyDayBadge" style="font-size:0.7rem;"></span>
+  </div>
+  <div style="position:relative;height:220px;width:100%;">
+    <canvas id="dayOfWeekChart"></canvas>
+  </div>
+  <div class="text-center mt-1" style="font-size:0.65rem;color:var(--text-muted);">Avg cigarettes per day (last 30 days)</div>
 </div>
 
 <!-- Trigger & Mood Distribution -->
@@ -101,6 +130,9 @@
   window.__hourly = <%- hourly %>;
   window.__triggerDist = <%- triggerDist %>;
   window.__moodDist = <%- moodDist %>;
+  window.__weekly4 = <%- weekly4 %>;
+  window.__dayOfWeek = <%- dayOfWeek %>;
+  window.__dailyGoal = <%= dailyGoal %>;
 </script>
 
 </div><!-- /page-content -->

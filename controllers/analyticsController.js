@@ -5,11 +5,15 @@ exports.getAnalytics = async (req, res, next) => {
   try {
     const userId = req.session.userId;
     const createdAt = req.session.userCreatedAt;
+    const settings = await require('../models/UserSettings').findOne({ userId });
     const daily7 = await patternService.getMovingAverage7Day(userId, createdAt);
     const hourly = await patternService.getHourlyDistribution(userId, 30, createdAt);
     const financials = await financialService.getFinancials(userId, createdAt);
     const triggerDist = await patternService.getTriggerDistribution(userId, 30, createdAt);
     const moodDist = await patternService.getMoodDistribution(userId, 30, createdAt);
+    const weekly4 = await patternService.getWeeklyCounts(userId, 4, createdAt);
+    const dayOfWeek = await patternService.getDayOfWeekDistribution(userId, 30, createdAt);
+    const dailyGoal = settings ? settings.dailyGoal : 5;
 
     res.render('analytics', {
       title: 'Analytics',
@@ -17,7 +21,10 @@ exports.getAnalytics = async (req, res, next) => {
       hourly: JSON.stringify(hourly),
       financials,
       triggerDist: JSON.stringify(triggerDist),
-      moodDist: JSON.stringify(moodDist)
+      moodDist: JSON.stringify(moodDist),
+      weekly4: JSON.stringify(weekly4),
+      dayOfWeek: JSON.stringify(dayOfWeek),
+      dailyGoal
     });
   } catch (err) {
     next(err);
@@ -55,7 +62,8 @@ exports.getAnalyticsData = async (req, res, next) => {
     }
 
     const hourly = await patternService.getHourlyDistribution(userId, hourlyDays, createdAt);
-    res.json({ trendData, hourly });
+    const weekly4 = await patternService.getWeeklyCounts(userId, 4, createdAt);
+    res.json({ trendData, hourly, weekly4 });
   } catch (err) {
     next(err);
   }
