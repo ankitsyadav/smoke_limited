@@ -2,22 +2,28 @@ const moment = require('moment-timezone');
 moment.tz.setDefault('Asia/Kolkata');
 const SmokeLog = require('../models/SmokeLog');
 
-// Clamp a start date so it's never before user's account creation
-function clampStart(date, createdAt) {
-  if (!createdAt) return date;
-  const ca = new Date(createdAt);
+// Get earliest smoke log date for a user (the real "start" of their data)
+async function getEarliestLogDate(userId) {
+  const earliest = await SmokeLog.findOne({ userId }).sort({ timestamp: 1 }).select('timestamp').lean();
+  return earliest ? earliest.timestamp : null;
+}
+
+// Clamp a start date so it's never before the anchor date
+function clampStart(date, anchor) {
+  if (!anchor) return date;
+  const ca = new Date(anchor);
   return date < ca ? ca : date;
 }
 
-// How many days since account creation (min 1)
-function daysSinceCreation(createdAt) {
-  if (!createdAt) return 30;
-  const days = moment().diff(moment(createdAt), 'days') + 1;
+// How many days since the anchor date (min 1)
+function daysSinceAnchor(anchor) {
+  if (!anchor) return 30;
+  const days = moment().diff(moment(anchor), 'days') + 1;
   return Math.max(days, 1);
 }
 
 async function getHourlyDistribution(userId, days = 30, createdAt) {
-  const maxDays = Math.min(days, daysSinceCreation(createdAt));
+  const maxDays = Math.min(days, daysSinceAnchor(createdAt));
   const since = clampStart(moment().subtract(maxDays, 'days').startOf('day').toDate(), createdAt);
   const logs = await SmokeLog.find({ userId, timestamp: { $gte: since } });
   const buckets = Array(24).fill(0);
@@ -38,7 +44,7 @@ async function getPeakHour(userId, days = 30, createdAt) {
 }
 
 async function getMovingAverage7Day(userId, createdAt) {
-  const maxDays = Math.min(7, daysSinceCreation(createdAt));
+  const maxDays = Math.min(90, daysSinceAnchor(createdAt));
   const results = [];
   for (let i = maxDays - 1; i >= 0; i--) {
     const dayStart = moment().subtract(i, 'days').startOf('day').toDate();
@@ -52,7 +58,7 @@ async function getMovingAverage7Day(userId, createdAt) {
 }
 
 async function getTrend(userId, createdAt) {
-  const daysAvail = daysSinceCreation(createdAt);
+  const daysAvail = daysSinceAnchor(createdAt);
   if (daysAvail < 2) return 'stable';
   const last3 = [];
   const prev3 = [];
@@ -85,7 +91,7 @@ async function getTodayCount(userId) {
 }
 
 async function getWeeklyAverage(userId, createdAt) {
-  const daysAvail = Math.min(7, daysSinceCreation(createdAt));
+  const daysAvail = Math.min(7, daysSinceAnchor(createdAt));
   const start = clampStart(moment().subtract(daysAvail, 'days').startOf('day').toDate(), createdAt);
   const total = await SmokeLog.countDocuments({ userId, timestamp: { $gte: start } });
   return total / daysAvail;
@@ -119,7 +125,7 @@ async function getTotalLifetime(userId) {
 }
 
 async function getDailyCounts(userId, days = 30, createdAt) {
-  const maxDays = Math.min(days, daysSinceCreation(createdAt));
+  const maxDays = Math.min(days, daysSinceAnchor(createdAt));
   const results = [];
   for (let i = maxDays - 1; i >= 0; i--) {
     const dayStart = moment().subtract(i, 'days').startOf('day').toDate();
@@ -186,7 +192,7 @@ async function getTodayTimeline(userId) {
 
 // ── Trigger distribution ──
 async function getTriggerDistribution(userId, days = 30, createdAt) {
-  const maxDays = Math.min(days, daysSinceCreation(createdAt));
+  const maxDays = Math.min(days, daysSinceAnchor(createdAt));
   const since = clampStart(moment().subtract(maxDays, 'days').startOf('day').toDate(), createdAt);
   const logs = await SmokeLog.find({ userId, timestamp: { $gte: since }, trigger: { $ne: '' } });
   const dist = {};
@@ -198,7 +204,7 @@ async function getTriggerDistribution(userId, days = 30, createdAt) {
 
 // ── Mood distribution ──
 async function getMoodDistribution(userId, days = 30, createdAt) {
-  const maxDays = Math.min(days, daysSinceCreation(createdAt));
+  const maxDays = Math.min(days, daysSinceAnchor(createdAt));
   const since = clampStart(moment().subtract(maxDays, 'days').startOf('day').toDate(), createdAt);
   const logs = await SmokeLog.find({ userId, timestamp: { $gte: since }, mood: { $ne: '' } });
   const dist = {};
@@ -213,9 +219,9 @@ async function getStreakData(userId, createdAt) {
   const settings = (await require('../models/UserSettings').findOne({ userId })) || { dailyGoal: 5 };
   const goal = settings.dailyGoal;
 
-  const daysAvail = daysSinceCreation(createdAt);
+  const daysAvail = daysSinceAnchor(createdAt);
 
-  // Current streak: consecutive days at/under daily goal (only since account creation)
+  // Current streak: consecutive days at/under daily goal
   let currentStreak = 0;
   for (let i = 0; i < Math.min(365, daysAvail); i++) {
     const dayStart = moment().subtract(i, 'days').startOf('day').toDate();
@@ -272,7 +278,7 @@ async function getDailySummary(userId, days = 7, createdAt) {
 
 // ── Day of Week distribution ──
 async function getDayOfWeekDistribution(userId, days = 30, createdAt) {
-  const maxDays = Math.min(days, daysSinceCreation(createdAt));
+  const maxDays = Math.min(days, daysSinceAnchor(createdAt));
   const since = clampStart(moment().subtract(maxDays, 'days').startOf('day').toDate(), createdAt);
   const logs = await SmokeLog.find({ userId, timestamp: { $gte: since } });
   // 0=Mon, 1=Tue, ... 6=Sun (isoWeekday: 1=Mon to 7=Sun)
@@ -297,6 +303,7 @@ async function getDayOfWeekDistribution(userId, days = 30, createdAt) {
 }
 
 module.exports = {
+  getEarliestLogDate,
   getHourlyDistribution,
   getPeakHour,
   getMovingAverage7Day,
