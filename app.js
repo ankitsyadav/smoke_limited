@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
+const MongoStore = require('connect-mongo');
 const path = require('path');
 const routes = require('./routes');
 const errorHandler = require('./utils/errorHandler');
@@ -10,6 +10,10 @@ const { startCronJobs } = require('./services/cronService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isProd = process.env.NODE_ENV === 'production';
+
+// Trust Render's reverse proxy (essential for HTTPS cookies)
+if (isProd) app.set('trust proxy', 1);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -29,7 +33,9 @@ app.use(session({
   }),
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    httpOnly: true
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax'
   }
 }));
 
