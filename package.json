@@ -4,7 +4,7 @@
   "description": "Smoking Relapse Prediction System — behavioral analytics & AI-powered dashboard",
   "main": "app.js",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node app.js",
