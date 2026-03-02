@@ -1,0 +1,289 @@
+<%- include('layout') %>
+
+<!-- Floating Smoke Particles -->
+<div class="smoke-particles">
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+</div>
+
+<div class="page-content">
+
+<!-- Risk Badge with Explanation -->
+<div class="text-center mb-2 fade-in">
+  <div class="risk-orb risk-<%= risk.riskLevel.toLowerCase() %>">
+    <span class="risk-score"><%= risk.score %></span>
+    <span class="risk-label"><%= risk.riskLevel %></span>
+  </div>
+  <div class="risk-explain">
+    <small>Relapse Risk Score</small>
+    <div class="risk-bar-wrap">
+      <div class="risk-bar-fill" style="width:<%= risk.score %>%;"></div>
+    </div>
+    <div class="risk-explain-row">
+      <span class="re-safe">0 Safe</span>
+      <span class="re-mid">50</span>
+      <span class="re-danger">100 Danger</span>
+    </div>
+  </div>
+</div>
+
+<!-- Streak & Comparison -->
+<div class="row g-2 mb-3">
+  <div class="col-4 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val"><%= streak.currentStreak %></div>
+      <div class="mini-lbl">Day Streak</div>
+    </div>
+  </div>
+  <div class="col-4 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val">
+        <% if (streak.comparison === 'better') { %>
+          <span style="color:var(--accent-green);">↓</span>
+        <% } else if (streak.comparison === 'worse') { %>
+          <span style="color:var(--accent-red);">↑</span>
+        <% } else { %>
+          <span style="color:var(--accent-yellow);">=</span>
+        <% } %>
+        <span><%= streak.todayCount %>/<%= streak.yesterdayCount %></span>
+      </div>
+      <div class="mini-lbl">Today/Yday</div>
+    </div>
+  </div>
+  <div class="col-4 fade-in">
+    <div class="stat-card mini-stat">
+      <div class="mini-val" id="cravingTimer">
+        <% if (streak.lastMinutesAgo !== null) { %>
+          <% const hrs = Math.floor(streak.lastMinutesAgo / 60); const mins = streak.lastMinutesAgo % 60; %>
+          <%= hrs > 0 ? hrs + 'h ' : '' %><%= mins %>m
+        <% } else { %>--<% } %>
+      </div>
+      <div class="mini-lbl">Since Last</div>
+    </div>
+  </div>
+</div>
+
+<!-- I Smoked Button -->
+<div class="text-center mb-3 fade-in">
+  <button type="button" class="btn-smoke" id="smokeBtn" onclick="openSmokeModal()">
+    <i class="bi bi-fire"></i>
+    <span>I Smoked</span>
+  </button>
+</div>
+
+<!-- Smoke Modal (trigger/mood/note) -->
+<div class="smoke-modal-overlay" id="smokeModal" style="display:none;" onclick="closeSmokeModalOutside(event)">
+  <div class="smoke-modal">
+    <div class="smoke-modal-header">
+      <h6><i class="bi bi-fire"></i> Log Cigarette</h6>
+      <button class="modal-close-btn" onclick="closeSmokeModal()">&times;</button>
+    </div>
+    <div class="smoke-modal-body">
+      <div class="mb-3">
+        <label class="form-label">What triggered it?</label>
+        <div class="trigger-grid" id="triggerGrid">
+          <button type="button" class="trigger-chip" data-val="stress"><i class="bi bi-lightning"></i> Stress</button>
+          <button type="button" class="trigger-chip" data-val="boredom"><i class="bi bi-emoji-neutral"></i> Boredom</button>
+          <button type="button" class="trigger-chip" data-val="social"><i class="bi bi-people"></i> Social</button>
+          <button type="button" class="trigger-chip" data-val="craving"><i class="bi bi-fire"></i> Craving</button>
+          <button type="button" class="trigger-chip" data-val="habit"><i class="bi bi-clock-history"></i> Habit</button>
+          <button type="button" class="trigger-chip" data-val="after-meal"><i class="bi bi-cup-hot"></i> After Meal</button>
+          <button type="button" class="trigger-chip" data-val="anxiety"><i class="bi bi-heartbreak"></i> Anxiety</button>
+          <button type="button" class="trigger-chip" data-val="other"><i class="bi bi-three-dots"></i> Other</button>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">How are you feeling?</label>
+        <div class="trigger-grid" id="moodGrid">
+          <button type="button" class="mood-chip" data-val="stressed">😰 Stressed</button>
+          <button type="button" class="mood-chip" data-val="anxious">😟 Anxious</button>
+          <button type="button" class="mood-chip" data-val="bored">😑 Bored</button>
+          <button type="button" class="mood-chip" data-val="relaxed">😌 Relaxed</button>
+          <button type="button" class="mood-chip" data-val="angry">😠 Angry</button>
+          <button type="button" class="mood-chip" data-val="sad">😢 Sad</button>
+          <button type="button" class="mood-chip" data-val="happy">😊 Happy</button>
+          <button type="button" class="mood-chip" data-val="neutral">😐 Neutral</button>
+        </div>
+      </div>
+      <div class="mb-3">
+        <input type="text" class="form-control input-dark" id="smokeNote" placeholder="Quick note (optional)" maxlength="100">
+      </div>
+    </div>
+    <div class="smoke-modal-footer">
+      <button class="btn btn-olive w-100" id="confirmSmokeBtn" onclick="confirmSmoke()">
+        <span id="smokeBtnText"><i class="bi bi-check-lg"></i> Log It</span>
+        <span id="smokeBtnLoader" style="display:none;">
+          <span class="spinner-border spinner-border-sm"></span> Logging...
+        </span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- AI Feedback Panel (shows after logging) -->
+<div class="glass-card ai-feedback-card mb-3 fade-in" id="aiFeedbackPanel" style="display:none;">
+  <div class="d-flex align-items-start">
+    <div class="ai-icon-wrap"><i class="bi bi-robot"></i></div>
+    <div style="flex:1;min-width:0;">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <h6 class="mb-0" style="color:#8ab4f8;font-size:0.8rem;font-weight:600;">AI Feedback</h6>
+        <span class="ai-badge" style="margin-bottom:0;"><i class="bi bi-stars"></i> Live</span>
+      </div>
+      <div class="ai-text" id="aiFeedbackText"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Today Stats -->
+<div class="row g-2 mb-3">
+  <div class="col-6 fade-in">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-hash"></i></div>
+      <div class="stat-value" id="todayCountDisplay"><%= todayCount %></div>
+      <div class="stat-label">Today</div>
+      <div class="progress mt-2" style="height:6px;">
+        <div class="progress-bar bg-olive" id="goalProgress" style="width:<%= Math.min((todayCount / settings.dailyGoal) * 100, 100) %>%"></div>
+      </div>
+      <small class="text-muted">Goal: <%= settings.dailyGoal %></small>
+    </div>
+  </div>
+  <div class="col-6 fade-in">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-clock"></i></div>
+      <div class="stat-value"><%= peakHour %>:00</div>
+      <div class="stat-label">Peak Hour</div>
+    </div>
+  </div>
+  <div class="col-6 fade-in">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-arrow-repeat"></i></div>
+      <div class="stat-value"><%= avgGap || '--' %></div>
+      <div class="stat-label">Avg Gap (min)</div>
+    </div>
+  </div>
+  <div class="col-6 fade-in">
+    <div class="stat-card">
+      <div class="stat-value">
+        <% if (trend === 'improving') { %>
+          <span class="badge bg-success"><i class="bi bi-arrow-down"></i> Improving</span>
+        <% } else if (trend === 'worsening') { %>
+          <span class="badge bg-danger"><i class="bi bi-arrow-up"></i> Worsening</span>
+        <% } else { %>
+          <span class="badge bg-warning"><i class="bi bi-dash"></i> Stable</span>
+        <% } %>
+      </div>
+      <div class="stat-label">7-Day Trend</div>
+    </div>
+  </div>
+</div>
+
+<!-- Today's Timeline -->
+<% if (timeline && timeline.length > 0) { %>
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-clock-history"></i> Today's Timeline</h6>
+  <div class="timeline-wrap" id="timelineWrap">
+    <% timeline.forEach(function(entry, idx) { %>
+      <div class="timeline-entry">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <span class="timeline-time"><%= entry.time %></span>
+          <% if (entry.trigger) { %><span class="timeline-tag trigger-tag"><%= entry.trigger %></span><% } %>
+          <% if (entry.mood) { %><span class="timeline-tag mood-tag"><%= entry.mood %></span><% } %>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+</div>
+<% } %>
+
+<!-- Financial Cards -->
+<div class="row g-2 mb-3">
+  <div class="col-6 fade-in">
+    <div class="stat-card money-card">
+      <div class="stat-icon"><i class="bi bi-cash"></i></div>
+      <div class="stat-value">₹<%= financials.monthlyCost %></div>
+      <div class="stat-label">Monthly Cost</div>
+    </div>
+  </div>
+  <div class="col-6 fade-in">
+    <div class="stat-card money-card">
+      <div class="stat-icon"><i class="bi bi-piggy-bank"></i></div>
+      <div class="stat-value">₹<%= financials.yearlyCost %></div>
+      <div class="stat-label">Yearly Cost</div>
+    </div>
+  </div>
+</div>
+
+<!-- Health Card -->
+<% if (health) { %>
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-heart-pulse"></i> Today's Health</h6>
+  <div class="d-flex justify-content-between">
+    <div class="text-center"><div class="health-val"><%= health.hrv %></div><small>HRV</small></div>
+    <div class="text-center"><div class="health-val"><%= health.restingHR %></div><small>RHR</small></div>
+    <div class="text-center"><div class="health-val"><%= health.sleepScore %></div><small>Sleep</small></div>
+    <div class="text-center"><div class="health-val"><%= health.spo2 %>%</div><small>SpO2</small></div>
+  </div>
+</div>
+<% } else { %>
+<a href="/health" class="glass-card mb-3 d-block text-decoration-none text-center fade-in" style="color:var(--olive-light);">
+  <i class="bi bi-plus-circle" style="font-size:1.5rem;"></i>
+  <div>Enter today's health data</div>
+</a>
+<% } %>
+
+<!-- Rapid Repeat Warning -->
+<% if (rapidRepeat) { %>
+<div class="alert alert-warning glass-card mb-3 fade-in" style="border-left:4px solid #ffd93d;">
+  <i class="bi bi-exclamation-triangle"></i> <strong>RAPID REPEAT!</strong> Two cigarettes within 60 minutes. Try to slow down.
+</div>
+<% } %>
+
+<!-- Risk Flags -->
+<% if (risk.flags.length > 0) { %>
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-flag"></i> Risk Flags</h6>
+  <ul class="risk-flags-list">
+    <% risk.flags.forEach(function(f) { %>
+      <li><%= f %></li>
+    <% }); %>
+  </ul>
+</div>
+<% } %>
+
+<!-- AI Advice (loaded client-side via Puter.js) -->
+<div class="glass-card ai-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-robot"></i> AI Advice</h6>
+  <div class="ai-badge"><i class="bi bi-stars"></i> GPT-4.1 Powered</div>
+  <div id="dashboardAILoader" class="ai-loader-wrap">
+    <div class="spinner-border spinner-border-sm"></div>
+    <small>Analyzing your patterns...</small>
+  </div>
+  <div id="dashboardAIText" class="ai-text-glow" style="display:none;">
+    <div class="ai-text"></div>
+  </div>
+</div>
+
+<script>
+  window.__dailyGoal = <%- JSON.stringify(settings.dailyGoal) %>;
+  window.__lastMinutesAgo = <%- streak.lastMinutesAgo !== null ? JSON.stringify(streak.lastMinutesAgo) : 'null' %>;
+  window.__dashboardData = <%- JSON.stringify({
+    todayCount: todayCount,
+    weeklyAvg: weeklyAvg,
+    peakHour: peakHour,
+    trend: trend,
+    avgGap: avgGap,
+    riskScore: risk.score,
+    riskLevel: risk.riskLevel,
+    flags: risk.flags,
+    streak: { currentStreak: streak.currentStreak, todayCount: streak.todayCount, yesterdayCount: streak.yesterdayCount },
+    health: health ? { hrv: health.hrv, restingHR: health.restingHR, sleepScore: health.sleepScore, spo2: health.spo2 } : null,
+    dailyGoal: settings.dailyGoal
+  }) %>;
+</script>
+
+</div><!-- /page-content -->
+
+<%- include('partials/footer') %>

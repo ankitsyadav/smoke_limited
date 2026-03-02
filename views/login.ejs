@@ -1,0 +1,57 @@
+<%- include('layout') %>
+
+<!-- Floating Smoke Particles -->
+<div class="smoke-particles">
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+</div>
+
+<div class="auth-container page-content">
+  <!-- Ambient Glow -->
+  <div class="auth-ambient auth-ambient-1"></div>
+  <div class="auth-ambient auth-ambient-2"></div>
+
+  <div class="auth-logo">
+    <div class="auth-logo-icon">
+      <i class="bi bi-lungs"></i>
+    </div>
+  </div>
+  <div class="text-center mb-4" style="animation: authFieldSlide 0.3s ease forwards; opacity:0;">
+    <h4 style="color:var(--olive-light);margin-top:4px;">Welcome Back</h4>
+    <p style="color:var(--text-muted);font-size:0.85rem;">Login karke apna dashboard dekho</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-danger glass-card" style="border-left:4px solid #ff6b6b;padding:10px 14px;margin-bottom:16px;animation:fadeInUp 0.4s ease forwards;">
+      <i class="bi bi-exclamation-triangle"></i> <%= error %>
+    </div>
+  <% } %>
+
+  <form action="/login" method="POST">
+    <div class="glass-card mb-3 shine-border" style="padding:20px;">
+      <div class="mb-3 auth-field">
+        <label class="form-label"><i class="bi bi-envelope"></i> Email</label>
+        <input type="email" name="email" class="form-control input-dark" placeholder="your@email.com" required autofocus>
+      </div>
+      <div class="mb-3 auth-field">
+        <label class="form-label"><i class="bi bi-lock"></i> Password</label>
+        <input type="password" name="password" class="form-control input-dark" placeholder="••••••••" required>
+      </div>
+      <div class="auth-field">
+        <button type="submit" class="btn btn-olive btn-ripple w-100">
+          <i class="bi bi-box-arrow-in-right"></i> Login
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <div class="text-center auth-field" style="animation-delay:0.6s;">
+    <p style="color:var(--text-muted);font-size:0.85rem;">
+      Account nahi hai? <a href="/signup" class="link-slide" style="color:var(--olive-light);font-weight:600;">Sign Up karo</a>
+    </p>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

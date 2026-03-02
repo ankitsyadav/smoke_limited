@@ -1,0 +1,65 @@
+<%- include('layout') %>
+
+<!-- Floating Smoke Particles -->
+<div class="smoke-particles">
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+</div>
+
+<div class="auth-container page-content">
+  <!-- Ambient Glow -->
+  <div class="auth-ambient auth-ambient-1"></div>
+  <div class="auth-ambient auth-ambient-2"></div>
+
+  <div class="auth-logo">
+    <div class="auth-logo-icon">
+      <i class="bi bi-lungs"></i>
+    </div>
+  </div>
+  <div class="text-center mb-4" style="animation: authFieldSlide 0.3s ease forwards; opacity:0;">
+    <h4 style="color:var(--olive-light);margin-top:4px;">Join Limited 🚬</h4>
+    <p style="color:var(--text-muted);font-size:0.85rem;">1 minute mein account banao, tracking shuru karo</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-danger glass-card" style="border-left:4px solid #ff6b6b;padding:10px 14px;margin-bottom:16px;animation:fadeInUp 0.4s ease forwards;">
+      <i class="bi bi-exclamation-triangle"></i> <%= error %>
+    </div>
+  <% } %>
+
+  <form action="/signup" method="POST">
+    <div class="glass-card mb-3 shine-border" style="padding:20px;">
+      <div class="mb-3 auth-field">
+        <label class="form-label"><i class="bi bi-person"></i> Name</label>
+        <input type="text" name="name" class="form-control input-dark" placeholder="Tumhara naam" required autofocus>
+      </div>
+      <div class="mb-3 auth-field">
+        <label class="form-label"><i class="bi bi-envelope"></i> Email</label>
+        <input type="email" name="email" class="form-control input-dark" placeholder="your@email.com" required>
+      </div>
+      <div class="mb-3 auth-field">
+        <label class="form-label"><i class="bi bi-lock"></i> Password</label>
+        <input type="password" name="password" class="form-control input-dark" placeholder="Kam se kam 4 characters" required minlength="4">
+      </div>
+      <div class="mb-3 auth-field">
+        <label class="form-label"><i class="bi bi-lock-fill"></i> Confirm Password</label>
+        <input type="password" name="confirmPassword" class="form-control input-dark" placeholder="Phir se password daalo" required minlength="4">
+      </div>
+      <div class="auth-field">
+        <button type="submit" class="btn btn-olive btn-ripple w-100">
+          <i class="bi bi-person-plus"></i> Sign Up
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <div class="text-center auth-field" style="animation-delay:0.7s;">
+    <p style="color:var(--text-muted);font-size:0.85rem;">
+      Pehle se account hai? <a href="/login" class="link-slide" style="color:var(--olive-light);font-weight:600;">Login karo</a>
+    </p>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

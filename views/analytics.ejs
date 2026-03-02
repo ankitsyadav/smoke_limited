@@ -1,0 +1,124 @@
+<%- include('layout') %>
+
+<!-- Floating Smoke Particles -->
+<div class="smoke-particles">
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+  <div class="smoke-particle"></div><div class="smoke-particle"></div>
+</div>
+
+<div class="page-content">
+<h5 class="text-center mb-3 fade-in" style="color:var(--olive-light);"><i class="bi bi-graph-up"></i> Analytics</h5>
+
+<!-- Range Dropdown -->
+<div class="glass-card mb-3 fade-in" style="padding:10px 16px;">
+  <div class="d-flex align-items-center justify-content-between">
+    <span style="color:var(--olive-light);font-weight:600;font-size:0.85rem;"><i class="bi bi-calendar3"></i> Time Range</span>
+    <div class="dropdown-wrap">
+      <select id="rangeSelect" class="form-select input-dark" style="width:auto;padding:6px 32px 6px 12px;font-size:0.85rem;border-radius:10px;">
+        <option value="daily" selected>Daily (7 Days)</option>
+        <option value="weekly">Weekly (12 Weeks)</option>
+        <option value="monthly">Monthly (12 Months)</option>
+        <option value="yearly">Yearly (5 Years)</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Spinner -->
+<div id="chartLoader" class="text-center mb-3" style="display:none;">
+  <div class="spinner-border text-success spinner-border-sm" role="status"></div>
+  <small style="color:var(--text-muted);margin-left:6px;">Loading...</small>
+</div>
+
+<!-- Trend Line Chart -->
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title" id="trendTitle">Last 7 Days</h6>
+  <div style="position:relative;height:220px;width:100%;">
+    <canvas id="dailyChart"></canvas>
+  </div>
+</div>
+
+<!-- Hourly Distribution Bar Chart -->
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title" id="hourlyTitle">Hourly Distribution (7 Days)</h6>
+  <div style="position:relative;height:220px;width:100%;">
+    <canvas id="hourlyChart"></canvas>
+  </div>
+</div>
+
+<!-- Health Correlation Chart (dual axis) -->
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-heart-pulse"></i> Health vs Smoking (14 Days)</h6>
+  <div style="position:relative;height:250px;width:100%;">
+    <canvas id="healthCorrChart"></canvas>
+  </div>
+  <div class="text-center mt-2">
+    <small style="color:var(--text-muted);">
+      <span style="color:#6b8f71;">●</span> Cigarettes &nbsp;
+      <span style="color:#8ab4f8;">●</span> HRV &nbsp;
+      <span style="color:#ffd93d;">●</span> Sleep
+    </small>
+  </div>
+</div>
+
+<!-- Trigger & Mood Distribution -->
+<div class="row g-2 mb-3">
+  <div class="col-6 fade-in">
+    <div class="glass-card" style="min-height:200px;">
+      <h6 class="card-title" style="font-size:0.8rem;"><i class="bi bi-lightning"></i> Triggers</h6>
+      <div style="position:relative;height:160px;width:100%;">
+        <canvas id="triggerChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 fade-in">
+    <div class="glass-card" style="min-height:200px;">
+      <h6 class="card-title" style="font-size:0.8rem;"><i class="bi bi-emoji-smile"></i> Moods</h6>
+      <div style="position:relative;height:160px;width:100%;">
+        <canvas id="moodChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Analytics Insight -->
+<div class="glass-card ai-card mb-3 fade-in">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <h6 class="card-title mb-0"><i class="bi bi-robot"></i> AI Analytics Insight</h6>
+    <button class="ai-refresh-btn" id="refreshAIBtn" onclick="loadAnalyticsAI()">
+      <i class="bi bi-arrow-clockwise"></i>
+    </button>
+  </div>
+  <div class="ai-badge"><i class="bi bi-stars"></i> GPT-4.1 Powered</div>
+  <div id="aiAnalyticsLoader" style="display:none;" class="ai-loader-wrap">
+    <div class="spinner-border spinner-border-sm"></div>
+    <small>Analyzing patterns...</small>
+  </div>
+  <div id="aiAnalyticsText" class="ai-text-glow">
+    <div class="ai-text">Tap the refresh button to generate AI insights from your data.</div>
+  </div>
+</div>
+
+<!-- Financial Summary -->
+<div class="glass-card mb-3 fade-in">
+  <h6 class="card-title"><i class="bi bi-cash-stack"></i> Financial Summary</h6>
+  <table class="table table-dark table-sm mb-0" style="background:transparent;">
+    <tr><td>Monthly Cost</td><td class="text-end fw-bold" style="color:var(--olive-light);">₹<%= financials.monthlyCost %></td></tr>
+    <tr><td>Yearly Cost</td><td class="text-end fw-bold" style="color:var(--olive-light);">₹<%= financials.yearlyCost %></td></tr>
+    <tr><td>Lifetime Cigarettes</td><td class="text-end fw-bold" style="color:var(--olive-light);"><%= financials.lifetimeCigarettes %></td></tr>
+    <tr><td>Lifetime Cost</td><td class="text-end fw-bold" style="color:#ff6b6b;">₹<%= financials.lifetimeCost %></td></tr>
+  </table>
+</div>
+
+<script>
+  window.__daily7 = <%- daily7 %>;
+  window.__hourly = <%- hourly %>;
+  window.__triggerDist = <%- triggerDist %>;
+  window.__moodDist = <%- moodDist %>;
+  window.__healthCorr = <%- healthCorr %>;
+</script>
+
+</div><!-- /page-content -->
+
+<%- include('partials/footer') %>
