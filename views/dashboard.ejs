@@ -27,6 +27,26 @@
       <span class="re-danger">100 Danger</span>
     </div>
   </div>
+  <!-- Score Breakdown Mini Bar -->
+  <% if (risk.scoreBreakdown) { %>
+  <div class="score-breakdown-wrap">
+    <div class="score-breakdown-bar">
+      <% const sb = risk.scoreBreakdown; %>
+      <% if (sb.limit > 0) { %><div class="sb-seg sb-limit" style="width:<%= sb.limit %>%" title="Limit: <%= sb.limit %>"></div><% } %>
+      <% if (sb.gap > 0) { %><div class="sb-seg sb-gap" style="width:<%= sb.gap %>%" title="Gap: <%= sb.gap %>"></div><% } %>
+      <% if (sb.trend > 0) { %><div class="sb-seg sb-trend" style="width:<%= sb.trend %>%" title="Trend: <%= sb.trend %>"></div><% } %>
+      <% if (sb.peak > 0) { %><div class="sb-seg sb-peak" style="width:<%= sb.peak %>%" title="Peak: <%= sb.peak %>"></div><% } %>
+      <% if (sb.behavior > 0) { %><div class="sb-seg sb-behavior" style="width:<%= sb.behavior %>%" title="Behavior: <%= sb.behavior %>"></div><% } %>
+    </div>
+    <div class="score-breakdown-legend">
+      <% if (sb.limit > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-limit"></span>Limit <%= sb.limit %></span><% } %>
+      <% if (sb.gap > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-gap"></span>Gap <%= sb.gap %></span><% } %>
+      <% if (sb.trend > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-trend"></span>Trend <%= sb.trend %></span><% } %>
+      <% if (sb.peak > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-peak"></span>Peak <%= sb.peak %></span><% } %>
+      <% if (sb.behavior > 0) { %><span class="sb-legend-item"><span class="sb-dot sb-behavior"></span>Behavior <%= sb.behavior %></span><% } %>
+    </div>
+  </div>
+  <% } %>
 </div>
 
 <!-- ═══ TOP: Today Count / Target / % vs Yesterday ═══ -->
@@ -269,22 +289,32 @@
   </div>
 </div>
 
-<!-- Rapid Repeat Warning -->
-<% if (rapidRepeat) { %>
-<div class="alert alert-warning glass-card mb-3 fade-in" style="border-left:4px solid #ffd93d;">
-  <i class="bi bi-exclamation-triangle"></i> <strong>RAPID REPEAT!</strong> 60 min ke andar 2 cigarettes — thoda slow karo bhai.
-</div>
-<% } %>
-
-<!-- Risk Flags -->
+<!-- Behavior Trend Flags -->
 <% if (risk.flags.length > 0) { %>
 <div class="glass-card mb-3 fade-in">
-  <h6 class="card-title"><i class="bi bi-flag"></i> Risk Flags</h6>
-  <ul class="risk-flags-list">
+  <h6 class="card-title"><i class="bi bi-activity"></i> Behavior Insights</h6>
+  <div class="behavior-flags-wrap">
     <% risk.flags.forEach(function(f) { %>
-      <li><%= f %></li>
+      <div class="behavior-flag behavior-flag-<%= f.severity %>">
+        <div class="bf-icon-wrap">
+          <i class="bi bi-<%= f.icon %>"></i>
+        </div>
+        <div class="bf-content">
+          <div class="bf-text"><%= f.text %></div>
+          <div class="bf-meta">
+            <span class="bf-category"><%= f.category %></span>
+            <% if (f.trend === 'worsening') { %>
+              <span class="bf-trend bf-trend-bad">↗ worsening</span>
+            <% } else if (f.trend === 'improving') { %>
+              <span class="bf-trend bf-trend-good">↘ improving</span>
+            <% } else { %>
+              <span class="bf-trend bf-trend-neutral">→ stable</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
     <% }); %>
-  </ul>
+  </div>
 </div>
 <% } %>
 
@@ -308,11 +338,16 @@
     todayCount: todayCount,
     weeklyAvg: weeklyAvg,
     peakHour: peakHour,
-    trend: trend,
+    trend: risk.trend,
     avgGap: avgGap,
     riskScore: risk.score,
     riskLevel: risk.riskLevel,
-    flags: risk.flags,
+    flags: risk.flags.map(function(f) { return f.text; }),
+    flagsDetailed: risk.flags,
+    scoreBreakdown: risk.scoreBreakdown,
+    consecutiveBreach: risk.consecutiveBreach,
+    triggerBreakdown: risk.triggerBreakdown,
+    gapTrend: risk.gapTrend,
     streak: { currentStreak: streak.currentStreak, todayCount: streak.todayCount, yesterdayCount: streak.yesterdayCount },
     dailyGoal: settings.dailyGoal
   }) %>;

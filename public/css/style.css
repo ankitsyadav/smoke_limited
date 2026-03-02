@@ -183,6 +183,21 @@ body {
 }
 .risk-high::before { border-color: rgba(255, 107, 107, 0.5); }
 
+/* MODERATE risk (orange) */
+.risk-moderate {
+  background: radial-gradient(circle at 40% 40%, #8a5a20, #5a3a10);
+  box-shadow: 0 0 40px rgba(255, 165, 0, 0.4), 0 0 80px rgba(255, 165, 0, 0.15);
+}
+.risk-moderate::before { border-color: rgba(255, 165, 0, 0.4); }
+
+/* CRITICAL risk (deep red pulsing) */
+.risk-critical {
+  background: radial-gradient(circle at 40% 40%, #a01010, #600808);
+  box-shadow: 0 0 50px rgba(255, 50, 50, 0.6), 0 0 100px rgba(255, 50, 50, 0.3);
+  animation: orbPulse 1s ease-in-out infinite;
+}
+.risk-critical::before { border-color: rgba(255, 50, 50, 0.6); }
+
 .risk-score {
   font-size: 2.5rem;
   font-weight: 800;
@@ -259,7 +274,7 @@ body {
   box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
 }
 
-/* Risk Flags */
+/* Risk Flags (legacy) */
 .risk-flags-list {
   list-style: none;
   padding: 0;
@@ -280,6 +295,170 @@ body {
 .risk-flags-list li:last-child {
   border-bottom: none;
 }
+
+/* ══════════════════════════════
+   SCORE BREAKDOWN BAR
+   ══════════════════════════════ */
+.score-breakdown-wrap {
+  margin-top: 10px;
+  width: 180px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.score-breakdown-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(107, 143, 113, 0.15);
+  gap: 1px;
+}
+
+.sb-seg {
+  height: 100%;
+  min-width: 2px;
+  transition: width 0.5s ease;
+}
+
+.sb-seg.sb-limit { background: #ff6b6b; }
+.sb-seg.sb-gap { background: #ffa94d; }
+.sb-seg.sb-trend { background: #ffd93d; }
+.sb-seg.sb-peak { background: #74c0fc; }
+.sb-seg.sb-behavior { background: #da77f2; }
+
+.score-breakdown-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sb-legend-item {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sb-dot.sb-limit { background: #ff6b6b; }
+.sb-dot.sb-gap { background: #ffa94d; }
+.sb-dot.sb-trend { background: #ffd93d; }
+.sb-dot.sb-peak { background: #74c0fc; }
+.sb-dot.sb-behavior { background: #da77f2; }
+
+/* ══════════════════════════════
+   BEHAVIOR INSIGHT FLAGS
+   ══════════════════════════════ */
+.behavior-flags-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.behavior-flag {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-left: 4px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.behavior-flag:hover {
+  transform: translateX(2px);
+}
+
+.behavior-flag-danger {
+  border-left-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.06);
+}
+
+.behavior-flag-warning {
+  border-left-color: #ffd93d;
+  background: rgba(255, 217, 61, 0.05);
+}
+
+.behavior-flag-info {
+  border-left-color: #6bff6b;
+  background: rgba(107, 255, 107, 0.04);
+}
+
+.bf-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.behavior-flag-danger .bf-icon-wrap {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+}
+
+.behavior-flag-warning .bf-icon-wrap {
+  background: rgba(255, 217, 61, 0.15);
+  color: #ffd93d;
+}
+
+.behavior-flag-info .bf-icon-wrap {
+  background: rgba(107, 255, 107, 0.12);
+  color: #6bff6b;
+}
+
+.bf-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.bf-text {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.bf-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bf-category {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: rgba(107, 143, 113, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.bf-trend {
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.bf-trend-bad { color: #ff6b6b; }
+.bf-trend-good { color: #6bff6b; }
+.bf-trend-neutral { color: #ffd93d; }
 
 /* ══════════════════════════════
    AI CARDS — PREMIUM GLASS

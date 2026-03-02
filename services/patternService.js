@@ -302,6 +302,119 @@ async function getDayOfWeekDistribution(userId, days = 30, createdAt) {
   }));
 }
 
+// ── Gap Trend: compare avg gap of last 3 days vs previous 3 days ──
+async function getGapTrend(userId, createdAt) {
+  const daysAvail = daysSinceAnchor(createdAt);
+  if (daysAvail < 2) return { currentAvgGap: null, previousAvgGap: null, changePercent: 0 };
+
+  async function avgGapForDayRange(startDay, endDay) {
+    const gaps = [];
+    for (let i = startDay; i < endDay; i++) {
+      const dayStart = clampStart(moment().subtract(i, 'days').startOf('day').toDate(), createdAt);
+      const dayEnd = moment().subtract(i, 'days').endOf('day').toDate();
+      if (dayStart > dayEnd) continue;
+      const logs = await SmokeLog.find({ userId, timestamp: { $gte: dayStart, $lte: dayEnd } }).sort({ timestamp: 1 });
+      if (logs.length < 2) continue;
+      for (let j = 1; j < logs.length; j++) {
+        gaps.push(moment(logs[j].timestamp).diff(moment(logs[j - 1].timestamp), 'minutes'));
+      }
+    }
+    if (gaps.length === 0) return null;
+    return Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+  }
+
+  const recentN = Math.min(3, daysAvail);
+  const prevN = Math.min(3, Math.max(0, daysAvail - recentN));
+  const currentAvgGap = await avgGapForDayRange(0, recentN);
+  const previousAvgGap = prevN > 0 ? await avgGapForDayRange(recentN, recentN + prevN) : null;
+
+  let changePercent = 0;
+  if (previousAvgGap && previousAvgGap > 0 && currentAvgGap !== null) {
+    changePercent = Math.round(((currentAvgGap - previousAvgGap) / previousAvgGap) * 100);
+  }
+
+  return { currentAvgGap, previousAvgGap, changePercent };
+}
+
+// ── Today's Trigger Breakdown ──
+async function getTodayTriggerBreakdown(userId) {
+  const start = moment().startOf('day').toDate();
+  const end = moment().endOf('day').toDate();
+  const logs = await SmokeLog.find({ userId, timestamp: { $gte: start, $lte: end }, trigger: { $ne: '' } });
+  const total = await SmokeLog.countDocuments({ userId, timestamp: { $gte: start, $lte: end } });
+  if (logs.length === 0) return { dominant: null, count: 0, total, percentage: 0 };
+  const dist = {};
+  logs.forEach(l => { dist[l.trigger] = (dist[l.trigger] || 0) + 1; });
+  const sorted = Object.entries(dist).sort((a, b) => b[1] - a[1]);
+  const [dominant, count] = sorted[0];
+  return { dominant, count, total, percentage: total > 0 ? Math.round((count / total) * 100) : 0 };
+}
+
+// ── Weighted 7-day Trend (recent days have higher weight) ──
+async function getWeightedTrend(userId, createdAt) {
+  const daysAvail = daysSinceAnchor(createdAt);
+  if (daysAvail < 2) return { direction: 'stable', percentChange: 0, recentAvg: 0, olderAvg: 0 };
+
+  const recentN = Math.min(3, daysAvail);
+  const olderN = Math.min(4, Math.max(0, daysAvail - recentN));
+
+  // Recent days (0,1,2) — weights: 3,2,1
+  let recentWeightedSum = 0, recentWeightTotal = 0;
+  for (let i = 0; i < recentN; i++) {
+    const dayStart = clampStart(moment().subtract(i, 'days').startOf('day').toDate(), createdAt);
+    const dayEnd = moment().subtract(i, 'days').endOf('day').toDate();
+    const count = await SmokeLog.countDocuments({ userId, timestamp: { $gte: dayStart, $lte: dayEnd } });
+    const weight = recentN - i; // today=3, yesterday=2, day before=1
+    recentWeightedSum += count * weight;
+    recentWeightTotal += weight;
+  }
+
+  // Older days (3,4,5,6) — equal weight
+  let olderSum = 0;
+  for (let i = recentN; i < recentN + olderN; i++) {
+    const dayStart = clampStart(moment().subtract(i, 'days').startOf('day').toDate(), createdAt);
+    const dayEnd = moment().subtract(i, 'days').endOf('day').toDate();
+    const count = await SmokeLog.countDocuments({ userId, timestamp: { $gte: dayStart, $lte: dayEnd } });
+    olderSum += count;
+  }
+
+  const recentAvg = recentWeightTotal > 0 ? recentWeightedSum / recentWeightTotal : 0;
+  const olderAvg = olderN > 0 ? olderSum / olderN : 0;
+
+  let percentChange = 0;
+  if (olderAvg > 0) {
+    percentChange = Math.round(((recentAvg - olderAvg) / olderAvg) * 100);
+  }
+
+  let direction = 'stable';
+  if (percentChange > 10) direction = 'worsening';
+  else if (percentChange < -10) direction = 'improving';
+
+  return {
+    direction,
+    percentChange,
+    recentAvg: parseFloat(recentAvg.toFixed(1)),
+    olderAvg: parseFloat(olderAvg.toFixed(1))
+  };
+}
+
+// ── Consecutive days over daily limit ──
+async function getConsecutiveLimitBreachDays(userId, createdAt) {
+  const settings = (await require('../models/UserSettings').findOne({ userId })) || { dailyGoal: 5 };
+  const goal = settings.dailyGoal;
+  const daysAvail = daysSinceAnchor(createdAt);
+  let streak = 0;
+  for (let i = 0; i < Math.min(30, daysAvail); i++) {
+    const dayStart = clampStart(moment().subtract(i, 'days').startOf('day').toDate(), createdAt);
+    const dayEnd = moment().subtract(i, 'days').endOf('day').toDate();
+    if (dayStart > dayEnd) break;
+    const count = await SmokeLog.countDocuments({ userId, timestamp: { $gte: dayStart, $lte: dayEnd } });
+    if (count > goal) streak++;
+    else break;
+  }
+  return streak;
+}
+
 module.exports = {
   getEarliestLogDate,
   getHourlyDistribution,
@@ -323,5 +436,9 @@ module.exports = {
   getMoodDistribution,
   getStreakData,
   getDailySummary,
-  getDayOfWeekDistribution
+  getDayOfWeekDistribution,
+  getGapTrend,
+  getTodayTriggerBreakdown,
+  getWeightedTrend,
+  getConsecutiveLimitBreachDays
 };

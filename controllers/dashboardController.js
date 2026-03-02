@@ -22,6 +22,7 @@ exports.getDashboard = async (req, res, next) => {
     const timeline = await patternService.getTodayTimeline(userId);
     const streak = await patternService.getStreakData(userId, createdAt);
     const weeklyAvg = await patternService.getWeeklyAverage(userId, createdAt);
+    const weightedTrend = await patternService.getWeightedTrend(userId, createdAt);
 
     res.render('dashboard', {
       title: 'Dashboard',
@@ -35,7 +36,8 @@ exports.getDashboard = async (req, res, next) => {
       financials,
       timeline,
       streak,
-      weeklyAvg
+      weeklyAvg,
+      weightedTrend
     });
   } catch (err) {
     next(err);

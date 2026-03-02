@@ -688,19 +688,38 @@ Trigger/mood mention kar agar diya hai. 1 line, Hinglish, bas.`,
     const loader = document.getElementById('dashboardAILoader');
     const textEl = document.getElementById('dashboardAIText');
 
-    // Build rich pattern context
+    // Build rich pattern context with structured flags
     const overLimit = d.todayCount >= d.dailyGoal;
     const pct = d.dailyGoal > 0 ? Math.round((d.todayCount / d.dailyGoal) * 100) : 0;
     const gapInfo = d.avgGap ? `Avg gap between cigs: ${d.avgGap} min` : 'Gap data unavailable';
+
+    // Build detailed flag summary
+    let flagSummary = '';
+    if (d.flagsDetailed && d.flagsDetailed.length > 0) {
+      const dangerFlags = d.flagsDetailed.filter(f => f.severity === 'danger').map(f => '🔴 ' + f.text);
+      const warnFlags = d.flagsDetailed.filter(f => f.severity === 'warning').map(f => '🟡 ' + f.text);
+      const infoFlags = d.flagsDetailed.filter(f => f.severity === 'info').map(f => '🟢 ' + f.text);
+      flagSummary = [...dangerFlags, ...warnFlags, ...infoFlags].join('\n');
+    }
+
+    // Score breakdown info
+    let breakdownInfo = '';
+    if (d.scoreBreakdown) {
+      const sb = d.scoreBreakdown;
+      breakdownInfo = `Score breakdown: Limit=${sb.limit}/30, Gap=${sb.gap}/20, Trend=${sb.trend}/20, Peak=${sb.peak}/15, Behavior=${sb.behavior}/15`;
+    }
 
     const dashPrompt = `USER'S REAL-TIME SMOKING DATA:
 • Today: ${d.todayCount}/${d.dailyGoal} cigarettes (${pct}% of limit)${overLimit ? ' — OVER LIMIT!' : ''}
 • Weekly avg: ${d.weeklyAvg}/day | Trend: ${d.trend}
 • Peak hour: ${toAMPM(d.peakHour)} | ${gapInfo}
-• Risk: ${d.riskScore}/100 (${d.riskLevel})
+• Risk: ${d.riskScore}/100 (${d.riskLevel}) | ${breakdownInfo}
 • Streak under limit: ${d.streak.currentStreak} days
 • Yesterday: ${d.streak.yesterdayCount} cigs
-${d.flags && d.flags.length > 0 ? '• Flags: ' + d.flags.join(', ') : ''}
+${d.consecutiveBreach > 0 ? '• Consecutive days over limit: ' + d.consecutiveBreach : ''}
+${d.triggerBreakdown && d.triggerBreakdown.dominant ? '• Top trigger today: ' + d.triggerBreakdown.dominant + ' (' + d.triggerBreakdown.percentage + '%)' : ''}
+${d.gapTrend && d.gapTrend.currentAvgGap ? '• Gap trend: ' + d.gapTrend.previousAvgGap + '→' + d.gapTrend.currentAvgGap + ' min (' + d.gapTrend.changePercent + '%)' : ''}
+${flagSummary ? '• Behavior Flags:\n' + flagSummary : ''}
 Abhi ka time: ${new Date().toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:true})}`;
 
     callPuterAI(
