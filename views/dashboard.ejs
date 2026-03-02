@@ -40,16 +40,16 @@
   <div class="col-4 fade-in">
     <div class="stat-card mini-stat">
       <div class="mini-val">
-        <% if (streak.comparison === 'better') { %>
-          <span style="color:var(--accent-green);">↓</span>
-        <% } else if (streak.comparison === 'worse') { %>
-          <span style="color:var(--accent-red);">↑</span>
+        <% if (todayCount < settings.dailyGoal) { %>
+          <span style="color:var(--accent-green);" id="limitIcon">✓</span>
+        <% } else if (todayCount === settings.dailyGoal) { %>
+          <span style="color:var(--accent-yellow);" id="limitIcon">⚠</span>
         <% } else { %>
-          <span style="color:var(--accent-yellow);">=</span>
+          <span style="color:var(--accent-red);" id="limitIcon">✗</span>
         <% } %>
-        <span><%= streak.todayCount %>/<%= streak.yesterdayCount %></span>
+        <span id="todayLimitDisplay"><%= todayCount %>/<%= settings.dailyGoal %></span>
       </div>
-      <div class="mini-lbl">Today/Yday</div>
+      <div class="mini-lbl">Today/Limit</div>
     </div>
   </div>
   <div class="col-4 fade-in">
@@ -73,7 +73,7 @@
   </button>
 </div>
 
-<!-- Smoke Modal (trigger/mood/note) -->
+<!-- Smoke Modal (trigger/mood/note + date/time) -->
 <div class="smoke-modal-overlay" id="smokeModal" style="display:none;" onclick="closeSmokeModalOutside(event)">
   <div class="smoke-modal">
     <div class="smoke-modal-header">
@@ -81,6 +81,41 @@
       <button class="modal-close-btn" onclick="closeSmokeModal()">&times;</button>
     </div>
     <div class="smoke-modal-body">
+
+      <!-- Date & Time Picker -->
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-clock-history"></i> When did you smoke?</label>
+        <div class="datetime-picker-wrap">
+          <div class="dt-toggle-row">
+            <button type="button" class="dt-toggle-btn dt-active" id="dtNowBtn" onclick="setDateTimeMode('now')">
+              <i class="bi bi-clock"></i> Abhi
+            </button>
+            <button type="button" class="dt-toggle-btn" id="dtCustomBtn" onclick="setDateTimeMode('custom')">
+              <i class="bi bi-calendar-event"></i> Custom Time
+            </button>
+          </div>
+          <div id="dtCustomFields" style="display:none;" class="dt-custom-fields">
+            <div class="d-flex gap-2">
+              <div style="flex:1;">
+                <label class="form-label" style="font-size:0.75rem;margin-bottom:2px;">Date</label>
+                <input type="date" id="smokeDate" class="form-control input-dark" style="font-size:0.85rem;padding:8px 10px;">
+              </div>
+              <div style="flex:1;">
+                <label class="form-label" style="font-size:0.75rem;margin-bottom:2px;">Time</label>
+                <input type="time" id="smokeTime" class="form-control input-dark" style="font-size:0.85rem;padding:8px 10px;">
+              </div>
+            </div>
+            <div class="dt-quick-row">
+              <button type="button" class="dt-quick-chip" onclick="quickTimeOffset(5)">5 min pehle</button>
+              <button type="button" class="dt-quick-chip" onclick="quickTimeOffset(15)">15 min</button>
+              <button type="button" class="dt-quick-chip" onclick="quickTimeOffset(30)">30 min</button>
+              <button type="button" class="dt-quick-chip" onclick="quickTimeOffset(60)">1 hour</button>
+              <button type="button" class="dt-quick-chip" onclick="quickTimeOffset(120)">2 hours</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="mb-3">
         <label class="form-label">What triggered it?</label>
         <div class="trigger-grid" id="triggerGrid">
@@ -112,7 +147,7 @@
       </div>
     </div>
     <div class="smoke-modal-footer">
-      <button class="btn btn-olive w-100" id="confirmSmokeBtn" onclick="confirmSmoke()">
+      <button class="btn btn-olive btn-ripple w-100" id="confirmSmokeBtn" onclick="confirmSmoke()">
         <span id="smokeBtnText"><i class="bi bi-check-lg"></i> Log It</span>
         <span id="smokeBtnLoader" style="display:none;">
           <span class="spinner-border spinner-border-sm"></span> Logging...
@@ -216,24 +251,6 @@
   </div>
 </div>
 
-<!-- Health Card -->
-<% if (health) { %>
-<div class="glass-card mb-3 fade-in">
-  <h6 class="card-title"><i class="bi bi-heart-pulse"></i> Today's Health</h6>
-  <div class="d-flex justify-content-between">
-    <div class="text-center"><div class="health-val"><%= health.hrv %></div><small>HRV</small></div>
-    <div class="text-center"><div class="health-val"><%= health.restingHR %></div><small>RHR</small></div>
-    <div class="text-center"><div class="health-val"><%= health.sleepScore %></div><small>Sleep</small></div>
-    <div class="text-center"><div class="health-val"><%= health.spo2 %>%</div><small>SpO2</small></div>
-  </div>
-</div>
-<% } else { %>
-<a href="/health" class="glass-card mb-3 d-block text-decoration-none text-center fade-in" style="color:var(--olive-light);">
-  <i class="bi bi-plus-circle" style="font-size:1.5rem;"></i>
-  <div>Enter today's health data</div>
-</a>
-<% } %>
-
 <!-- Rapid Repeat Warning -->
 <% if (rapidRepeat) { %>
 <div class="alert alert-warning glass-card mb-3 fade-in" style="border-left:4px solid #ffd93d;">
@@ -279,7 +296,6 @@
     riskLevel: risk.riskLevel,
     flags: risk.flags,
     streak: { currentStreak: streak.currentStreak, todayCount: streak.todayCount, yesterdayCount: streak.yesterdayCount },
-    health: health ? { hrv: health.hrv, restingHR: health.restingHR, sleepScore: health.sleepScore, spo2: health.spo2 } : null,
     dailyGoal: settings.dailyGoal
   }) %>;
 </script>

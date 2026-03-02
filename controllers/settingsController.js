@@ -12,15 +12,14 @@ exports.getSettings = async (req, res, next) => {
 exports.saveSettings = async (req, res, next) => {
   try {
     const userId = req.session.userId;
-    const { costPerCigarette, dailyGoal, email, baselineHRV } = req.body;
+    const { costPerCigarette, dailyGoal, email } = req.body;
     await UserSettings.findOneAndUpdate(
       { userId },
       {
         userId,
         costPerCigarette: Number(costPerCigarette),
         dailyGoal: Number(dailyGoal) || 5,
-        email,
-        baselineHRV: Number(baselineHRV) || 50
+        email
       },
       { upsert: true, new: true }
     );

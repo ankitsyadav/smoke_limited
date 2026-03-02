@@ -1,6 +1,6 @@
-const moment = require('moment');
+const moment = require('moment-timezone');
+moment.tz.setDefault('Asia/Kolkata');
 const UserSettings = require('../models/UserSettings');
-const DailyHealthMetrics = require('../models/DailyHealthMetrics');
 const patternService = require('../services/patternService');
 const predictionService = require('../services/predictionService');
 const financialService = require('../services/financialService');
@@ -23,11 +23,6 @@ exports.getDashboard = async (req, res, next) => {
     const streak = await patternService.getStreakData(userId, createdAt);
     const weeklyAvg = await patternService.getWeeklyAverage(userId, createdAt);
 
-    const todayStart = moment().startOf('day').toDate();
-    const health = await DailyHealthMetrics.findOne({ userId, date: todayStart });
-
-    // AI advice now handled client-side via Puter.js (free GPT-4.1)
-    // Pass all context as JSON for the client to use
     res.render('dashboard', {
       title: 'Dashboard',
       settings,
@@ -38,7 +33,6 @@ exports.getDashboard = async (req, res, next) => {
       rapidRepeat,
       risk,
       financials,
-      health,
       timeline,
       streak,
       weeklyAvg

@@ -5,8 +5,8 @@ const userSettingsSchema = new mongoose.Schema({
   costPerCigarette: { type: Number, required: true },
   dailyGoal: { type: Number, default: 5 },
   email: { type: String, required: true },
-  baselineHRV: { type: Number, default: 50 },
   lastEmailSent: { type: Date, default: null },
+  lastPatternEmailSent: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now }
 });
 

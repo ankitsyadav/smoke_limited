@@ -10,7 +10,6 @@ exports.getAnalytics = async (req, res, next) => {
     const financials = await financialService.getFinancials(userId, createdAt);
     const triggerDist = await patternService.getTriggerDistribution(userId, 30, createdAt);
     const moodDist = await patternService.getMoodDistribution(userId, 30, createdAt);
-    const healthCorr = await patternService.getHealthCorrelation(userId, 14, createdAt);
 
     res.render('analytics', {
       title: 'Analytics',
@@ -18,8 +17,7 @@ exports.getAnalytics = async (req, res, next) => {
       hourly: JSON.stringify(hourly),
       financials,
       triggerDist: JSON.stringify(triggerDist),
-      moodDist: JSON.stringify(moodDist),
-      healthCorr: JSON.stringify(healthCorr)
+      moodDist: JSON.stringify(moodDist)
     });
   } catch (err) {
     next(err);
@@ -75,23 +73,23 @@ exports.getAnalyticsAI = async (req, res) => {
     const dailySummary = await patternService.getDailySummary(userId, 7, createdAt);
     const triggerDist = await patternService.getTriggerDistribution(userId, 30, createdAt);
     const moodDist = await patternService.getMoodDistribution(userId, 30, createdAt);
-    const healthCorr = await patternService.getHealthCorrelation(userId, 7, createdAt);
+    const avgGap = await patternService.getAverageGap(userId);
+    const hourlyDist = await patternService.getHourlyDistribution(userId, 30, createdAt);
 
     const topTriggers = Object.entries(triggerDist).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}(${v})`).join(', ');
     const topMoods = Object.entries(moodDist).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}(${v})`).join(', ');
 
-    const healthDays = healthCorr.filter(d => d.hrv !== null);
-    let healthSummary = '';
-    if (healthDays.length > 0) {
-      const avgHRV = (healthDays.reduce((s, d) => s + d.hrv, 0) / healthDays.length).toFixed(0);
-      const avgSleep = (healthDays.reduce((s, d) => s + d.sleepScore, 0) / healthDays.length).toFixed(0);
-      healthSummary = `Avg HRV: ${avgHRV}, Avg Sleep: ${avgSleep}/100 over ${healthDays.length} tracked days.`;
-    }
+    // Build hourly breakdown string — only hours with count > 0
+    const hourlyBreakdown = hourlyDist
+      .map((count, hour) => count > 0 ? `${hour}:00=${count}` : null)
+      .filter(Boolean)
+      .join(', ');
 
     // Return raw data — Puter.js calls GPT on client
     res.json({
       weeklyAvg, trend, peakHour, totalLifetime, dailySummary,
-      topTriggers, topMoods, healthSummary
+      topTriggers, topMoods, avgGap,
+      hourlyBreakdown: hourlyBreakdown || null
     });
   } catch (err) {
     console.error('[AnalyticsAI]', err);

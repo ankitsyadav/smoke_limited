@@ -5,7 +5,16 @@ document.addEventListener('DOMContentLoaded', function () {
   const gridColor = 'rgba(107, 143, 113, 0.12)';
   const tickColor = '#8aa88a';
 
-  const AI_MODEL = 'gpt-4.1-mini';
+  const AI_MODEL = 'gpt-4.1';
+
+  // Helper: convert 24h hour to AM/PM
+  function toAMPM(h) {
+    const hr = parseInt(h, 10);
+    if (isNaN(hr)) return h;
+    const suffix = hr >= 12 ? 'PM' : 'AM';
+    const h12 = hr % 12 || 12;
+    return h12 + suffix;
+  }
 
   const chartDefaults = {
     responsive: true,
@@ -24,16 +33,17 @@ document.addEventListener('DOMContentLoaded', function () {
     yearly: { trend: 'Last 5 Years', hourly: 'Hourly Distribution (All Time)' }
   };
 
-  let trendChart = null, hourlyChart = null, healthCorrChart = null, triggerChartObj = null, moodChartObj = null;
+  let trendChart = null, hourlyChart = null, triggerChartObj = null, moodChartObj = null;
 
   // ══════════════════════════════════════
   // ── PUTER.JS AI HELPER (FREE GPT) ──
   // ══════════════════════════════════════
   async function callPuterAI(systemPrompt, userPrompt) {
     try {
-      const resp = await puter.ai.chat(userPrompt, {
-        model: AI_MODEL,
-        system: systemPrompt
+      // Merge system + user into one prompt so model can't ignore instructions
+      const merged = systemPrompt + '\n\n--- USER DATA ---\n' + userPrompt;
+      const resp = await puter.ai.chat(merged, {
+        model: AI_MODEL
       });
       // puter.ai.chat returns { message: { content: "..." } } or a string
       if (typeof resp === 'string') return resp;
@@ -147,48 +157,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function buildHealthCorrChart(data) {
-    const ctx = document.getElementById('healthCorrChart');
-    if (!ctx) return;
-    if (healthCorrChart) healthCorrChart.destroy();
-    const labels = data.map(d => d.date);
-    healthCorrChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Cigarettes', data: data.map(d => d.count),
-            borderColor: olive, backgroundColor: 'rgba(107,143,113,0.1)',
-            borderWidth: 2.5, fill: false, tension: 0.3, yAxisID: 'y',
-            pointRadius: 4, pointBackgroundColor: oliveLight
-          },
-          {
-            label: 'HRV', data: data.map(d => d.hrv),
-            borderColor: '#8ab4f8', backgroundColor: 'transparent',
-            borderWidth: 2, borderDash: [5, 3], fill: false, tension: 0.3, yAxisID: 'y1',
-            pointRadius: d => d.raw !== null ? 3 : 0, spanGaps: true
-          },
-          {
-            label: 'Sleep', data: data.map(d => d.sleepScore),
-            borderColor: '#ffd93d', backgroundColor: 'transparent',
-            borderWidth: 2, borderDash: [3, 3], fill: false, tension: 0.3, yAxisID: 'y1',
-            pointRadius: d => d.raw !== null ? 3 : 0, spanGaps: true
-          }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: tickColor, font: { size: 9 } }, grid: { color: gridColor } },
-          y: { position: 'left', ticks: { color: olive, font: { size: 10 } }, grid: { color: gridColor }, beginAtZero: true, title: { display: true, text: 'Cigs', color: olive, font: { size: 10 } } },
-          y1: { position: 'right', ticks: { color: '#8ab4f8', font: { size: 10 } }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Health', color: '#8ab4f8', font: { size: 10 } } }
-        }
-      }
-    });
-  }
-
   function buildPieChart(canvasId, dist, colorPalette) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return null;
@@ -221,7 +189,6 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Initial render ──
   if (window.__daily7) buildTrendChart(window.__daily7);
   if (window.__hourly) buildHourlyChart(window.__hourly);
-  if (window.__healthCorr) buildHealthCorrChart(window.__healthCorr);
 
   const triggerColors = ['#ff6b6b', '#ffd93d', '#6bff6b', '#6bb5ff', '#ff6bff', '#ffaa6b', '#6bffd9', '#d96bff'];
   const moodColors = ['#ff6b6b', '#ffaa6b', '#ffd93d', '#6bff6b', '#6bb5ff', '#d96bff', '#ff6bff', '#6bffd9'];
@@ -275,13 +242,78 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // ── Date/Time picker state ──
+  let dtMode = 'now'; // 'now' or 'custom'
+
+  function getISTNow() {
+    // IST = UTC + 5:30
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    return new Date(utc + 5.5 * 3600000);
+  }
+
+  function prefillDateTime() {
+    const ist = getISTNow();
+    const dateStr = ist.getFullYear() + '-' + String(ist.getMonth() + 1).padStart(2, '0') + '-' + String(ist.getDate()).padStart(2, '0');
+    const timeStr = String(ist.getHours()).padStart(2, '0') + ':' + String(ist.getMinutes()).padStart(2, '0');
+    const dateInput = document.getElementById('smokeDate');
+    const timeInput = document.getElementById('smokeTime');
+    if (dateInput) { dateInput.value = dateStr; dateInput.max = dateStr; }
+    if (timeInput) timeInput.value = timeStr;
+  }
+
+  window.setDateTimeMode = function (mode) {
+    dtMode = mode;
+    const nowBtn = document.getElementById('dtNowBtn');
+    const customBtn = document.getElementById('dtCustomBtn');
+    const fields = document.getElementById('dtCustomFields');
+    if (mode === 'now') {
+      if (nowBtn) nowBtn.classList.add('dt-active');
+      if (customBtn) customBtn.classList.remove('dt-active');
+      if (fields) fields.style.display = 'none';
+    } else {
+      if (nowBtn) nowBtn.classList.remove('dt-active');
+      if (customBtn) customBtn.classList.add('dt-active');
+      if (fields) fields.style.display = 'block';
+      prefillDateTime();
+    }
+  };
+
+  window.quickTimeOffset = function (minutes) {
+    dtMode = 'custom';
+    const nowBtn = document.getElementById('dtNowBtn');
+    const customBtn = document.getElementById('dtCustomBtn');
+    const fields = document.getElementById('dtCustomFields');
+    if (nowBtn) nowBtn.classList.remove('dt-active');
+    if (customBtn) customBtn.classList.add('dt-active');
+    if (fields) fields.style.display = 'block';
+
+    const ist = getISTNow();
+    ist.setMinutes(ist.getMinutes() - minutes);
+    const dateStr = ist.getFullYear() + '-' + String(ist.getMonth() + 1).padStart(2, '0') + '-' + String(ist.getDate()).padStart(2, '0');
+    const timeStr = String(ist.getHours()).padStart(2, '0') + ':' + String(ist.getMinutes()).padStart(2, '0');
+    const dateInput = document.getElementById('smokeDate');
+    const timeInput = document.getElementById('smokeTime');
+    if (dateInput) dateInput.value = dateStr;
+    if (timeInput) timeInput.value = timeStr;
+  };
+
   // Expose modal functions globally
   window.openSmokeModal = function () {
     selectedTrigger = '';
     selectedMood = '';
+    dtMode = 'now';
     document.querySelectorAll('.trigger-chip, .mood-chip').forEach(b => b.classList.remove('chip-active'));
     const noteInput = document.getElementById('smokeNote');
     if (noteInput) noteInput.value = '';
+    // Reset date/time picker to "Abhi" mode
+    const nowBtn = document.getElementById('dtNowBtn');
+    const customBtn = document.getElementById('dtCustomBtn');
+    const fields = document.getElementById('dtCustomFields');
+    if (nowBtn) nowBtn.classList.add('dt-active');
+    if (customBtn) customBtn.classList.remove('dt-active');
+    if (fields) fields.style.display = 'none';
+    prefillDateTime();
     const modal = document.getElementById('smokeModal');
     if (modal) { modal.style.display = 'flex'; setTimeout(() => modal.classList.add('modal-visible'), 10); }
   };
@@ -305,11 +337,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const note = (document.getElementById('smokeNote') || {}).value || '';
 
+    // Build custom timestamp if in custom mode
+    let customTimestamp = null;
+    if (dtMode === 'custom') {
+      const dateVal = (document.getElementById('smokeDate') || {}).value;
+      const timeVal = (document.getElementById('smokeTime') || {}).value;
+      if (dateVal && timeVal) {
+        // Create IST timestamp string: YYYY-MM-DDTHH:MM:00+05:30
+        customTimestamp = dateVal + 'T' + timeVal + ':00+05:30';
+      }
+    }
+
     try {
       const res = await fetch('/api/smoke', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trigger: selectedTrigger, mood: selectedMood, note })
+        body: JSON.stringify({ trigger: selectedTrigger, mood: selectedMood, note, customTimestamp })
       });
       const data = await res.json();
 
@@ -317,6 +360,20 @@ document.addEventListener('DOMContentLoaded', function () {
         // Update dashboard elements
         const countEl = document.getElementById('todayCountDisplay');
         if (countEl) countEl.textContent = data.todayCount;
+
+        // Update Today/Limit mini-stat
+        const limitEl = document.getElementById('todayLimitDisplay');
+        if (limitEl) limitEl.textContent = data.todayCount + '/' + data.dailyGoal;
+        const limitIcon = document.getElementById('limitIcon');
+        if (limitIcon) {
+          if (data.todayCount < data.dailyGoal) {
+            limitIcon.textContent = '✓'; limitIcon.style.color = 'var(--accent-green)';
+          } else if (data.todayCount === data.dailyGoal) {
+            limitIcon.textContent = '⚠'; limitIcon.style.color = 'var(--accent-yellow)';
+          } else {
+            limitIcon.textContent = '✗'; limitIcon.style.color = 'var(--accent-red)';
+          }
+        }
 
         const progressEl = document.getElementById('goalProgress');
         if (progressEl) {
@@ -333,16 +390,28 @@ document.addEventListener('DOMContentLoaded', function () {
           feedbackPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
           // Build prompt with all smoking context
-          const smokePrompt = `User just smoked cigarette #${data.todayCount} today (goal: ${data.dailyGoal}/day).
-Trigger: ${data.trigger || 'not specified'}. Mood: ${data.mood || 'not specified'}.
-Weekly average: ${data.weeklyAvg} cigs/day. Trend: ${data.trend}. Peak hour: ${data.peakHour}:00.
-Average gap between cigarettes: ${data.lastGapMinutes || 'unknown'} min.
-Risk level: ${data.risk.riskLevel} (${data.risk.score}/100).
-${data.health ? `Health: HRV ${data.health.hrv}, Sleep ${data.health.sleepScore}/100, SpO2 ${data.health.spo2}%` : 'No health data today.'}
-${data.rapidRepeat ? 'WARNING: This is a rapid repeat (2 cigarettes within 60 min)!' : ''}`;
+          const overLimitNow = data.todayCount >= data.dailyGoal;
+          const smokePrompt = `JUST SMOKED — cigarette #${data.todayCount}/${data.dailyGoal} today${overLimitNow ? ' (OVER LIMIT!)' : ''}.
+Trigger: ${data.trigger || 'none'}. Mood: ${data.mood || 'none'}.
+Weekly avg: ${data.weeklyAvg}/day. Trend: ${data.trend}. Peak hour: ${toAMPM(data.peakHour)}.
+Gap since last: ${data.lastGapMinutes || '?'} min. Risk: ${data.risk.riskLevel} (${data.risk.score}/100).
+${data.rapidRepeat ? 'RAPID REPEAT — 2 cigs within 60 min!' : ''}`;
 
           callPuterAI(
-            'You are a supportive smoking cessation coach. Give brief, personalized feedback (2-3 sentences) based on the data. Be empathetic but direct. If there are concerning patterns, mention them. Include one specific actionable tip. Use Hindi-English mix if the trigger/mood suggests an Indian user. Keep it warm and motivating.',
+            `⚠️ STRICT RULES — TODHA BHI ENGLISH LIKHA TO FAIL:
+1. SIRF Hinglish. Pure English = FAIL.
+2. SIRF 1 line. Emoji + max 12 words. Koi heading/paragraph NAHI.
+3. Koi "Based on", "I suggest" type English mat likh.
+
+Format:
+[emoji] [kya hua + pattern — Hinglish me]
+
+Examples:
+🔥 Stress se 3rd baar aaj — gap sirf 45 min raha
+⚠️ Limit cross! ${data.dailyGoal} me se ${data.dailyGoal} — ruk ja ab
+✅ 3 ghante ka gap — badhiya pace, aise hi rakh
+
+Trigger/mood mention kar agar diya hai. 1 line, Hinglish, bas.`,
             smokePrompt
           ).then(advice => {
             feedbackText.innerHTML = formatAIText(advice);
@@ -442,20 +511,36 @@ ${data.rapidRepeat ? 'WARNING: This is a rapid repeat (2 cigarettes within 60 mi
     const loader = document.getElementById('dashboardAILoader');
     const textEl = document.getElementById('dashboardAIText');
 
-    const dashPrompt = `Smoking tracker data for a user trying to quit:
-- Today's count: ${d.todayCount} (daily goal: ${d.dailyGoal})
-- Weekly average: ${d.weeklyAvg} cigs/day
-- 7-day trend: ${d.trend}
-- Peak smoking hour: ${d.peakHour}:00
-- Average gap between cigarettes: ${d.avgGap || 'unknown'} min
-- Risk score: ${d.riskScore}/100 (${d.riskLevel})
-- Current streak of days under goal: ${d.streak.currentStreak}
-- Today vs yesterday: ${d.streak.todayCount} vs ${d.streak.yesterdayCount}
-${d.flags && d.flags.length > 0 ? '- Risk flags: ' + d.flags.join(', ') : ''}
-${d.health ? `- Health: HRV ${d.health.hrv}, RHR ${d.health.restingHR}, Sleep ${d.health.sleepScore}/100, SpO2 ${d.health.spo2}%` : '- No health data today'}`;
+    // Build rich pattern context
+    const overLimit = d.todayCount >= d.dailyGoal;
+    const pct = d.dailyGoal > 0 ? Math.round((d.todayCount / d.dailyGoal) * 100) : 0;
+    const gapInfo = d.avgGap ? `Avg gap between cigs: ${d.avgGap} min` : 'Gap data unavailable';
+
+    const dashPrompt = `USER'S REAL-TIME SMOKING DATA:
+• Today: ${d.todayCount}/${d.dailyGoal} cigarettes (${pct}% of limit)${overLimit ? ' — OVER LIMIT!' : ''}
+• Weekly avg: ${d.weeklyAvg}/day | Trend: ${d.trend}
+• Peak hour: ${toAMPM(d.peakHour)} | ${gapInfo}
+• Risk: ${d.riskScore}/100 (${d.riskLevel})
+• Streak under limit: ${d.streak.currentStreak} days
+• Yesterday: ${d.streak.yesterdayCount} cigs
+${d.flags && d.flags.length > 0 ? '• Flags: ' + d.flags.join(', ') : ''}
+Abhi ka time: ${new Date().toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata', hour:'2-digit', minute:'2-digit', hour12:true})}`;
 
     callPuterAI(
-      'You are a compassionate smoking cessation AI coach. Analyze the user\'s data and give personalized advice in 3-4 sentences. Highlight what\'s going well (if anything), warn about risks, and give ONE specific actionable tip for the next few hours. Keep it warm, direct, and motivating. Mix Hindi-English naturally.',
+      `⚠️ STRICT RULES — TODHA BHI ENGLISH LIKHA TO FAIL:
+1. SIRF Hinglish. Pure English = FAIL.
+2. SIRF 1 line. Emoji + max 12 words. Koi heading/paragraph NAHI.
+3. Koi "Based on", "Your data shows" type English mat likh.
+
+Format:
+[emoji] [pattern] — [tip]
+
+Examples:
+🕐 ${toAMPM(d.peakHour)} pe sabse zyada peeta hai — walk pe ja
+📉 Hafte me 30% kam hua — gap aur badhao
+⚠️ Aaj limit cross — ab ruk ja bhai
+
+Exact numbers data se utha. 1 line, Hinglish, bas.`,
       dashPrompt
     ).then(advice => {
       if (loader) loader.style.display = 'none';
@@ -492,15 +577,32 @@ ${d.health ? `- Health: HRV ${d.health.hrv}, RHR ${d.health.restingHR}, Sleep ${
         return;
       }
 
-      const analyticsPrompt = `Smoking tracker analytics:
-- Weekly average: ${d.weeklyAvg} cigs/day. Trend: ${d.trend}. Peak hour: ${d.peakHour}:00.
-- Lifetime total: ${d.totalLifetime} cigarettes.
-- Top triggers: ${d.topTriggers || 'none tracked'}. Top moods: ${d.topMoods || 'none tracked'}.
-- Last 7 days: ${JSON.stringify(d.dailySummary)}
-${d.healthSummary ? '- Health: ' + d.healthSummary : ''}`;
+      const analyticsPrompt = `DATA:
+Avg: ${d.weeklyAvg}/day | Peak: ${toAMPM(d.peakHour)} | Trend: ${d.trend}
+Triggers: ${d.topTriggers || 'none'} | Moods: ${d.topMoods || 'none'}
+7 days: ${d.dailySummary}
+Gap: ${d.avgGap || '?'} min | Total: ${d.totalLifetime}
+${d.hourlyBreakdown ? 'Hours: ' + d.hourlyBreakdown : ''}`;
 
       const insight = await callPuterAI(
-        'You are a data analyst for a smoking cessation app. Analyze the user\'s patterns and give a concise 3-4 sentence insight. Identify the most important pattern, the biggest risk factor, and one data-driven recommendation. Be specific with numbers. Mix Hindi-English naturally.',
+        `⚠️ STRICT RULES — TODHA BHI ENGLISH LIKHA TO FAIL:
+1. SIRF Hinglish (Hindi words English script me). Pure English = FAIL.
+2. SIRF 3 lines. Har line me emoji + max 10 words. Koi heading, paragraph, bullet, explanation NAHI.
+3. Koi "Based on", "Here is", "Interpretation", "Recommendation" type English mat likh.
+
+Format (exactly copy kar, sirf numbers/words change kar):
+🕐 [X AM/PM] tera peak time — yahi danger zone
+🔥 [trigger] se sabse zyada craving — [X] baar
+📊 [deep pattern insight — jaise gap trend, kab zyada peeta, kaunsa din heavy]
+
+3rd line me SIRF pattern/analysis likho. Koi suggestion/tip/exercise/bahar niklo type bakwas NAHI. Sirf data se pattern nikalo.
+
+Example output:
+🕐 1PM tera peak time — yahi danger zone
+🔥 habit se sabse zyada craving — 2 baar
+📊 weekend pe 2x zyada peeta hai weekday se
+
+Bas itna hi likho. 3 lines. Koi aur text mat do.`,
         analyticsPrompt
       );
       if (text) {
@@ -514,48 +616,6 @@ ${d.healthSummary ? '- Health: ' + d.healthSummary : ''}`;
         if (p) p.innerHTML = formatAIText('Failed to load insight.');
         text.style.display = 'block';
       }
-    } finally {
-      if (loader) loader.style.display = 'none';
-      if (btn) btn.disabled = false;
-    }
-  };
-
-  // ══════════════════════════════════════
-  // ── HEALTH AI INSIGHT (Puter.js) ──
-  // ══════════════════════════════════════
-  window.loadHealthAI = async function () {
-    const loader = document.getElementById('healthAILoader');
-    const result = document.getElementById('healthAIResult');
-    const text = document.getElementById('healthAIText');
-    const btn = document.getElementById('refreshHealthAI');
-    if (loader) loader.style.display = 'block';
-    if (result) result.style.display = 'none';
-    if (btn) btn.disabled = true;
-    try {
-      // Fetch raw health + smoking data from server
-      const res = await fetch('/api/health/ai');
-      const d = await res.json();
-
-      if (d.noData) {
-        if (text) text.innerHTML = formatAIText(d.insight);
-        if (result) result.style.display = 'block';
-        return;
-      }
-
-      const healthPrompt = `Health + smoking data for analysis:
-- HRV: ${d.hrv} (baseline: ${d.baselineHRV}). Resting HR: ${d.restingHR}. Sleep score: ${d.sleepScore}/100. SpO2: ${d.spo2}%.
-- Today's cigarettes: ${d.todayCount}. Yesterday: ${d.yesterdayCount}. Weekly avg: ${d.weeklyAvg}.
-- Trend: ${d.trend}.`;
-
-      const insight = await callPuterAI(
-        'You are a health analyst specializing in smoking\'s impact on biometrics. Analyze the correlation between the user\'s smoking and health metrics. Give 3-4 sentences: how smoking is affecting their HRV/sleep/SpO2, compare to baseline, and give one specific health-focused tip. Be medically informed but accessible. Mix Hindi-English naturally.',
-        healthPrompt
-      );
-      if (text) text.innerHTML = formatAIText(insight);
-      if (result) result.style.display = 'block';
-    } catch (err) {
-      if (text) text.innerHTML = formatAIText('Failed to load insight.');
-      if (result) result.style.display = 'block';
     } finally {
       if (loader) loader.style.display = 'none';
       if (btn) btn.disabled = false;

@@ -259,14 +259,6 @@ body {
   box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
 }
 
-/* Health Values */
-.health-val {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--olive-light);
-  text-shadow: 0 0 10px var(--olive-glow);
-}
-
 /* Risk Flags */
 .risk-flags-list {
   list-style: none;
@@ -747,6 +739,94 @@ body::after {
 }
 
 /* ══════════════════════════════
+   DATE/TIME PICKER IN SMOKE MODAL
+   ══════════════════════════════ */
+.datetime-picker-wrap {
+  background: rgba(15, 25, 15, 0.5);
+  border: 1px solid rgba(107, 143, 113, 0.2);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.dt-toggle-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.dt-toggle-btn {
+  flex: 1;
+  background: rgba(107, 143, 113, 0.1);
+  border: 1px solid rgba(107, 143, 113, 0.25);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dt-toggle-btn:hover {
+  background: rgba(107, 143, 113, 0.2);
+  color: var(--text-primary);
+}
+
+.dt-toggle-btn.dt-active {
+  background: linear-gradient(135deg, var(--olive), var(--olive-dark));
+  border-color: var(--olive-light);
+  color: #fff;
+  box-shadow: 0 0 15px var(--olive-glow);
+  animation: chipBounce 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dt-custom-fields {
+  margin-top: 10px;
+  animation: authFieldSlide 0.3s ease forwards;
+}
+
+.dt-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dt-quick-chip {
+  background: rgba(107, 143, 113, 0.12);
+  border: 1px solid rgba(107, 143, 113, 0.2);
+  color: var(--olive-light);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.dt-quick-chip:hover {
+  background: rgba(107, 143, 113, 0.3);
+  border-color: var(--olive);
+  transform: scale(1.05);
+  color: #fff;
+}
+
+.dt-quick-chip:active {
+  transform: scale(0.95);
+}
+
+/* Date/time input overrides for dark theme */
+input[type="date"].input-dark,
+input[type="time"].input-dark {
+  color-scheme: dark;
+}
+
+/* ══════════════════════════════
    AI FEEDBACK PANEL (post-smoke)
    ══════════════════════════════ */
 .ai-feedback-card {
@@ -819,16 +899,6 @@ body::after {
   background: rgba(138, 180, 248, 0.2) !important;
   box-shadow: 0 0 12px rgba(138, 180, 248, 0.3);
   transform: rotate(180deg);
-}
-
-/* ── Health AI Result ── */
-.health-ai-result {
-  margin-top: 12px;
-  padding: 12px 14px;
-  background: rgba(138, 180, 248, 0.05);
-  border-radius: 12px;
-  border-left: 3px solid rgba(138, 180, 248, 0.35);
-  animation: aiFeedbackSlide 0.4s ease;
 }
 
 /* ══════════════════════════════

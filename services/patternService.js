@@ -1,6 +1,6 @@
-const moment = require('moment');
+const moment = require('moment-timezone');
+moment.tz.setDefault('Asia/Kolkata');
 const SmokeLog = require('../models/SmokeLog');
-const DailyHealthMetrics = require('../models/DailyHealthMetrics');
 
 // Clamp a start date so it's never before user's account creation
 function clampStart(date, createdAt) {
@@ -208,29 +208,6 @@ async function getMoodDistribution(userId, days = 30, createdAt) {
   return dist;
 }
 
-// ── Health correlation data (smoking count + health metrics per day) ──
-async function getHealthCorrelation(userId, days = 14, createdAt) {
-  const maxDays = Math.min(days, daysSinceCreation(createdAt));
-  const results = [];
-  for (let i = maxDays - 1; i >= 0; i--) {
-    const dayStart = moment().subtract(i, 'days').startOf('day').toDate();
-    const dayEnd = moment().subtract(i, 'days').endOf('day').toDate();
-    const clamped = clampStart(dayStart, createdAt);
-    if (clamped > dayEnd) continue;
-    const count = await SmokeLog.countDocuments({ userId, timestamp: { $gte: clamped, $lte: dayEnd } });
-    const health = await DailyHealthMetrics.findOne({ userId, date: dayStart });
-    results.push({
-      date: moment().subtract(i, 'days').format('MMM DD'),
-      count,
-      hrv: health ? health.hrv : null,
-      sleepScore: health ? health.sleepScore : null,
-      spo2: health ? health.spo2 : null,
-      restingHR: health ? health.restingHR : null
-    });
-  }
-  return results;
-}
-
 // ── Streak tracking ──
 async function getStreakData(userId, createdAt) {
   const settings = (await require('../models/UserSettings').findOne({ userId })) || { dailyGoal: 5 };
@@ -311,7 +288,6 @@ module.exports = {
   getTodayTimeline,
   getTriggerDistribution,
   getMoodDistribution,
-  getHealthCorrelation,
   getStreakData,
   getDailySummary
 };

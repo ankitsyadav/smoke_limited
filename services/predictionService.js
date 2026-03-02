@@ -1,6 +1,6 @@
-const moment = require('moment');
+const moment = require('moment-timezone');
+moment.tz.setDefault('Asia/Kolkata');
 const patternService = require('./patternService');
-const DailyHealthMetrics = require('../models/DailyHealthMetrics');
 const UserSettings = require('../models/UserSettings');
 
 async function calculateRiskScore(userId, createdAt) {
@@ -15,37 +15,30 @@ async function calculateRiskScore(userId, createdAt) {
   const weeklyAvg = await patternService.getWeeklyAverage(userId, createdAt);
   const trend = await patternService.getTrend(userId, createdAt);
 
-  const todayStart = moment().startOf('day').toDate();
-  const health = await DailyHealthMetrics.findOne({ userId, date: todayStart });
-
   if (Math.abs(nowHour - peakHour) <= 1 || (nowHour === peakHour)) {
     score += 25;
-    flags.push('Within peak smoking hour window');
+    flags.push('Peak smoking hour ke aas-paas ho');
   }
 
   if (lastMinutes !== null && lastMinutes < 90) {
     score += 15;
-    flags.push('Last cigarette was less than 90 minutes ago');
+    flags.push('Last cigarette 90 min se kam pehle thi');
   }
 
   if (todayCount > weeklyAvg) {
-    score += 15;
-    flags.push('Today count exceeds weekly average');
-  }
-
-  if (health && settings && settings.baselineHRV && health.hrv < settings.baselineHRV) {
     score += 20;
-    flags.push('HRV below baseline');
+    flags.push('Aaj weekly average se zyada smoke kiya');
   }
 
-  if (health && health.sleepScore < 70) {
-    score += 10;
-    flags.push('Sleep score below 70');
+  const dailyGoal = settings ? settings.dailyGoal : 5;
+  if (todayCount >= dailyGoal) {
+    score += 20;
+    flags.push(`Limit cross! ${todayCount}/${dailyGoal} ho gaye`);
   }
 
   if (trend === 'worsening') {
-    score += 15;
-    flags.push('Smoking trend is worsening');
+    score += 20;
+    flags.push('Trend bigad raha hai — pichle hafte se zyada');
   }
 
   score = Math.min(score, 100);

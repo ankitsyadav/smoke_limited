@@ -69,8 +69,7 @@ exports.postSignup = async (req, res) => {
       userId: user._id,
       costPerCigarette: 15,
       dailyGoal: 5,
-      email: user.email,
-      baselineHRV: 50
+      email: user.email
     });
 
     req.session.userId = user._id;

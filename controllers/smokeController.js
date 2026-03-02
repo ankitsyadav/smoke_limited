@@ -1,7 +1,7 @@
-const moment = require('moment');
+const moment = require('moment-timezone');
+moment.tz.setDefault('Asia/Kolkata');
 const SmokeLog = require('../models/SmokeLog');
 const UserSettings = require('../models/UserSettings');
-const DailyHealthMetrics = require('../models/DailyHealthMetrics');
 const patternService = require('../services/patternService');
 const predictionService = require('../services/predictionService');
 const emailService = require('../services/emailService');
@@ -11,12 +11,25 @@ exports.logSmokeAjax = async (req, res) => {
   try {
     const userId = req.session.userId;
     const createdAt = req.session.userCreatedAt;
-    const { trigger, mood, note } = req.body;
+    const { trigger, mood, note, customTimestamp } = req.body;
+
+    // Use custom timestamp if provided (validate it's not in the future)
+    let smokeTime = new Date();
+    if (customTimestamp) {
+      const parsed = new Date(customTimestamp);
+      if (!isNaN(parsed.getTime())) {
+        // Don't allow future timestamps (allow 2 min buffer for clock differences)
+        const now = new Date();
+        if (parsed.getTime() <= now.getTime() + 2 * 60000) {
+          smokeTime = parsed;
+        }
+      }
+    }
 
     // Save the smoke log
     await SmokeLog.create({
       userId,
-      timestamp: new Date(),
+      timestamp: smokeTime,
       trigger: trigger || '',
       mood: mood || '',
       note: note || ''
@@ -33,7 +46,6 @@ exports.logSmokeAjax = async (req, res) => {
     const risk = await predictionService.calculateRiskScore(userId, createdAt);
 
     const todayStart = moment().startOf('day').toDate();
-    const health = await DailyHealthMetrics.findOne({ userId, date: todayStart });
 
     // Send email if risk is HIGH (non-blocking)
     try {
@@ -42,6 +54,27 @@ exports.logSmokeAjax = async (req, res) => {
       }
     } catch (alertErr) {
       console.error('[ALERT] Non-fatal:', alertErr.message);
+    }
+
+    // Send pattern insight email (non-blocking, 4hr cooldown inside)
+    try {
+      const hourlyDist = await patternService.getHourlyDistribution(userId, 30, createdAt);
+      const triggerDist = await patternService.getTriggerDistribution(userId, 30, createdAt);
+      const topTriggerEntry = Object.entries(triggerDist).sort((a, b) => b[1] - a[1])[0];
+      const topTrigger = topTriggerEntry ? `${topTriggerEntry[0]} (${topTriggerEntry[1]}x)` : '';
+
+      emailService.sendPatternEmail(userId, {
+        todayCount,
+        dailyGoal: settings ? settings.dailyGoal : 5,
+        peakHour,
+        weeklyAvg: weeklyAvg.toFixed(1),
+        trend,
+        topTrigger,
+        avgGap: lastGapMinutes,
+        hourlyBreakdown: hourlyDist
+      });
+    } catch (patternErr) {
+      console.error('[PATTERN-EMAIL] Non-fatal:', patternErr.message);
     }
 
     // Get today's timeline
@@ -68,7 +101,6 @@ exports.logSmokeAjax = async (req, res) => {
       rapidRepeat,
       trigger: trigger || '',
       mood: mood || '',
-      health: health ? { hrv: health.hrv, sleepScore: health.sleepScore, spo2: health.spo2 } : null,
       timeline
     });
   } catch (err) {
